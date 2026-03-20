@@ -1,0 +1,561 @@
+/* ============================================================
+   Hotel WiFi Captive Portal — Base Styles
+   Theme: Refined Luxury / Dark Navy + Gold
+   Fonts: Cormorant Garamond (display) + Plus Jakarta Sans (UI)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+
+/* ─── Design Tokens ─── */
+:root {
+  /* Brand */
+  --gold: oklch(74% 0.09 75);
+  --gold-dim: oklch(60% 0.07 75);
+  --gold-glow: oklch(74% 0.09 75 / 0.15);
+
+  /* Backgrounds */
+  --bg-deep: oklch(8% 0.02 260);
+  --bg-mid: oklch(12% 0.025 255);
+  --bg-panel: oklch(15% 0.025 255);
+
+  /* Glass surfaces */
+  --glass-bg: oklch(100% 0 0 / 0.05);
+  --glass-border: oklch(100% 0 0 / 0.10);
+  --glass-border-hover: oklch(100% 0 0 / 0.18);
+  --glass-blur: blur(20px) saturate(180%);
+
+  /* Text */
+  --text-primary: oklch(94% 0.005 260);
+  --text-secondary: oklch(65% 0.01 260);
+  --text-muted: oklch(45% 0.01 260);
+  --text-gold: var(--gold);
+
+  /* State */
+  --error: oklch(65% 0.18 25);
+  --success: oklch(72% 0.14 160);
+
+  /* Motion */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Reset ─── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── Base ─── */
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background-color: var(--bg-deep);
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* ─── Background ─── */
+.portal-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 15% 60%, oklch(22% 0.04 255 / 0.6) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 85% 30%, oklch(18% 0.03 250 / 0.4) 0%, transparent 55%),
+    oklch(8% 0.02 260);
+}
+
+/* Subtle grain texture */
+.portal-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ─── Layout ─── */
+.portal-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100dvh;
+}
+
+@media (max-width: 680px) {
+  .portal-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+}
+
+/* ─── Branding Panel ─── */
+.brand-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(2rem, 5vw, 4rem);
+  border-right: 1px solid var(--glass-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-panel::before {
+  content: '';
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  background: var(--gold-glow);
+  border-radius: 50%;
+  top: -80px;
+  left: -80px;
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+@media (max-width: 680px) {
+  .brand-panel {
+    padding: 2.5rem 1.5rem 1.5rem;
+    border-right: none;
+    border-bottom: 1px solid var(--glass-border);
+  }
+  .brand-panel::before { display: none; }
+}
+
+.brand-logo {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-align: center;
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+}
+
+.brand-tagline {
+  font-size: 0.75rem;
+  font-weight: 300;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.brand-divider {
+  width: 32px;
+  height: 1px;
+  background: var(--gold-dim);
+  margin: 0 auto 2.5rem;
+  opacity: 0.6;
+}
+
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.brand-info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.brand-info-item svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+@media (max-width: 680px) {
+  .brand-info { flex-direction: row; justify-content: center; flex-wrap: wrap; }
+  .brand-divider { margin-bottom: 1.25rem; }
+  .brand-logo { margin-bottom: 0.3rem; }
+  .brand-tagline { margin-bottom: 1.5rem; }
+}
+
+/* ─── Form Panel ─── */
+.form-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+/* ─── Glass Card ─── */
+.glass-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: clamp(1.5rem, 4vw, 2.25rem);
+  animation: cardIn 0.6s var(--ease-out-quart) both;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  margin-bottom: 0.3rem;
+}
+
+.card-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+/* ─── Tabs ─── */
+.tab-switcher {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: oklch(0% 0 0 / 0.25);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 1.5rem;
+}
+
+.tab-btn {
+  padding: 0.45rem 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  border-radius: 7px;
+  transition: all 0.25s var(--ease-out-quart);
+}
+
+.tab-btn.active {
+  background: var(--glass-border-hover);
+  color: var(--text-primary);
+}
+
+/* ─── Form Fields ─── */
+.field-group {
+  margin-bottom: 1rem;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.field-input {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  background: oklch(100% 0 0 / 0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 0.9rem;
+  transition: border-color 0.2s, background 0.2s;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.field-input::placeholder {
+  color: var(--text-muted);
+}
+
+.field-input:focus {
+  border-color: var(--gold-dim);
+  background: oklch(100% 0 0 / 0.06);
+}
+
+.field-input.voucher-input {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ─── Checkbox ─── */
+.tc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-bottom: 1.25rem;
+}
+
+.tc-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--glass-border-hover);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 2px;
+  accent-color: var(--gold);
+}
+
+.tc-label {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.tc-label a {
+  color: var(--gold-dim);
+  text-decoration: none;
+}
+
+.tc-label a:hover {
+  color: var(--gold);
+}
+
+/* ─── Error Message ─── */
+.form-error {
+  font-size: 0.78rem;
+  color: var(--error);
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: oklch(65% 0.18 25 / 0.08);
+  border: 1px solid oklch(65% 0.18 25 / 0.2);
+  border-radius: 8px;
+  display: none;
+}
+
+.form-error.visible {
+  display: block;
+  animation: errorIn 0.25s var(--ease-out-quart);
+}
+
+@keyframes errorIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Submit Button ─── */
+.btn-connect {
+  width: 100%;
+  padding: 0.8rem 1.5rem;
+  background: linear-gradient(135deg, var(--gold), oklch(65% 0.11 60));
+  border: none;
+  border-radius: 10px;
+  color: oklch(10% 0.02 70);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-connect::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: oklch(100% 0 0 / 0.1);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.btn-connect:hover { opacity: 0.92; }
+.btn-connect:hover::after { opacity: 1; }
+.btn-connect:active { transform: scale(0.98); }
+
+.btn-connect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-connect .btn-spinner {
+  display: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid oklch(10% 0.02 70 / 0.3);
+  border-top-color: oklch(10% 0.02 70);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto;
+}
+
+.btn-connect.loading .btn-label { display: none; }
+.btn-connect.loading .btn-spinner { display: block; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Success / Status Pages ─── */
+.status-page {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.status-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  animation: iconPop 0.5s var(--ease-out-quart) 0.2s both;
+}
+
+@keyframes iconPop {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.status-icon.success {
+  background: oklch(72% 0.14 160 / 0.12);
+  border: 1px solid oklch(72% 0.14 160 / 0.3);
+  color: var(--success);
+}
+
+.status-icon.warning {
+  background: oklch(74% 0.09 75 / 0.12);
+  border: 1px solid oklch(74% 0.09 75 / 0.3);
+  color: var(--gold);
+}
+
+.status-icon.error {
+  background: oklch(65% 0.18 25 / 0.12);
+  border: 1px solid oklch(65% 0.18 25 / 0.3);
+  color: var(--error);
+}
+
+.status-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 300;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  animation: fadeUp 0.5s var(--ease-out-quart) 0.3s both;
+}
+
+.status-body {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  max-width: 32ch;
+  line-height: 1.7;
+  animation: fadeUp 0.5s var(--ease-out-quart) 0.4s both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.session-info-card {
+  margin: 2rem auto 0;
+  max-width: 300px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  animation: fadeUp 0.5s var(--ease-out-quart) 0.5s both;
+}
+
+.session-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  font-size: 0.8rem;
+}
+
+.session-info-row:not(:last-child) {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.session-info-row .label {
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+.session-info-row .value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.btn-secondary {
+  display: inline-block;
+  margin-top: 2rem;
+  padding: 0.65rem 2rem;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border-hover);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  animation: fadeUp 0.5s var(--ease-out-quart) 0.6s both;
+}
+
+.btn-secondary:hover {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+}
+
+/* ─── Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

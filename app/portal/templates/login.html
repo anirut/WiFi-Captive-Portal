@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#080d1a">
+  <title>{{ hotel_name|default('Hotel WiFi') }} — Connect</title>
+  <link rel="stylesheet" href="/static/css/portal.css">
+</head>
+<body>
+  <div class="portal-bg" aria-hidden="true"></div>
+
+  <main class="portal-shell">
+
+    <!-- ── Left: Branding ── -->
+    <aside class="brand-panel">
+      <div class="brand-logo">{{ hotel_name|default('Grand Hotel') }}</div>
+      <div class="brand-tagline">Complimentary WiFi Access</div>
+      <div class="brand-divider"></div>
+      <div class="brand-info">
+        <div class="brand-info-item">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <circle cx="8" cy="8" r="6"/><polyline points="8,4 8,8 10,10"/>
+          </svg>
+          Available throughout your stay
+        </div>
+        <div class="brand-info-item">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M8 2L3 5v4c0 3 5 5 5 5s5-2 5-5V5L8 2z"/>
+          </svg>
+          Secure connection
+        </div>
+        <div class="brand-info-item">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M1 8s2-4 7-4 7 4 7 4-2 4-7 4-7-4-7-4z"/><circle cx="8" cy="8" r="2"/>
+          </svg>
+          All areas covered
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── Right: Form ── -->
+    <section class="form-panel">
+      <div class="glass-card">
+        <h1 class="card-title">Welcome</h1>
+        <p class="card-subtitle">Sign in to access the internet</p>
+
+        <!-- Tab switcher -->
+        <div class="tab-switcher" role="tablist" aria-label="Authentication method">
+          <button class="tab-btn active" id="tab-room" role="tab"
+                  aria-selected="true" aria-controls="panel-room"
+                  onclick="switchTab('room')">Room Guest</button>
+          <button class="tab-btn" id="tab-voucher" role="tab"
+                  aria-selected="false" aria-controls="panel-voucher"
+                  onclick="switchTab('voucher')">Voucher Code</button>
+        </div>
+
+        <!-- Room auth form -->
+        <div id="panel-room" role="tabpanel" aria-labelledby="tab-room">
+          <form id="form-room" onsubmit="submitRoom(event)" novalidate>
+            <div class="field-group">
+              <label class="field-label" for="room-number">Room Number</label>
+              <input class="field-input" id="room-number" name="room_number"
+                     type="text" inputmode="numeric" placeholder="101"
+                     autocomplete="off" autocorrect="off" required>
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="last-name">Last Name</label>
+              <input class="field-input" id="last-name" name="last_name"
+                     type="text" placeholder="Smith"
+                     autocomplete="family-name" required>
+            </div>
+            <div class="tc-row">
+              <input class="tc-checkbox" type="checkbox" id="tc-room">
+              <label class="tc-label" for="tc-room">
+                I agree to the <a href="#" onclick="return false">Terms &amp; Conditions</a>
+                and acceptable use policy
+              </label>
+            </div>
+            <div class="form-error" id="error-room" role="alert"></div>
+            <button class="btn-connect" type="submit" id="btn-room">
+              <span class="btn-label">Connect</span>
+              <span class="btn-spinner" aria-hidden="true"></span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Voucher auth form -->
+        <div id="panel-voucher" role="tabpanel" aria-labelledby="tab-voucher" hidden>
+          <form id="form-voucher" onsubmit="submitVoucher(event)" novalidate>
+            <div class="field-group">
+              <label class="field-label" for="voucher-code">Voucher Code</label>
+              <input class="field-input voucher-input" id="voucher-code" name="code"
+                     type="text" placeholder="ABCD1234" maxlength="12"
+                     autocomplete="off" autocorrect="off" autocapitalize="characters" required>
+            </div>
+            <div class="tc-row">
+              <input class="tc-checkbox" type="checkbox" id="tc-voucher">
+              <label class="tc-label" for="tc-voucher">
+                I agree to the <a href="#" onclick="return false">Terms &amp; Conditions</a>
+                and acceptable use policy
+              </label>
+            </div>
+            <div class="form-error" id="error-voucher" role="alert"></div>
+            <button class="btn-connect" type="submit" id="btn-voucher">
+              <span class="btn-label">Connect</span>
+              <span class="btn-spinner" aria-hidden="true"></span>
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ── Tab switching ──
+    function switchTab(tab) {
+      const isRoom = tab === 'room';
+      document.getElementById('tab-room').classList.toggle('active', isRoom);
+      document.getElementById('tab-voucher').classList.toggle('active', !isRoom);
+      document.getElementById('tab-room').setAttribute('aria-selected', isRoom);
+      document.getElementById('tab-voucher').setAttribute('aria-selected', !isRoom);
+      document.getElementById('panel-room').hidden = !isRoom;
+      document.getElementById('panel-voucher').hidden = isRoom;
+      ['error-room', 'error-voucher'].forEach(id => {
+        const el = document.getElementById(id);
+        el.textContent = '';
+        el.classList.remove('visible');
+      });
+    }
+
+    // ── Error messages ──
+    const ERRORS = {
+      guest_not_checked_in: 'Room or last name not found. Please check and try again.',
+      pms_unavailable: 'Service temporarily unavailable. Please try again shortly.',
+      rate_limited: 'Too many attempts. Please wait a few minutes before trying again.',
+      invalid_code: 'Voucher code not recognised. Please check and try again.',
+      expired: 'This voucher has expired.',
+      no_uses_remaining: 'This voucher has no remaining uses.',
+    };
+
+    function showError(id, reason) {
+      const el = document.getElementById(id);
+      el.textContent = ERRORS[reason] || 'Authentication failed. Please try again.';
+      el.classList.add('visible');
+    }
+
+    function setLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      btn.classList.toggle('loading', loading);
+    }
+
+    // ── Room auth ──
+    async function submitRoom(e) {
+      e.preventDefault();
+      const f = e.target;
+      const errEl = document.getElementById('error-room');
+      errEl.classList.remove('visible');
+
+      if (!document.getElementById('tc-room').checked) {
+        errEl.textContent = 'Please accept the Terms & Conditions to continue.';
+        errEl.classList.add('visible');
+        return;
+      }
+
+      setLoading('btn-room', true);
+      try {
+        const res = await fetch('/auth/room', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            room_number: f.room_number.value.trim(),
+            last_name: f.last_name.value.trim(),
+            tc_accepted: true,
+          }),
+        });
+        if (res.ok) {
+          window.location.href = '/success';
+        } else {
+          const data = await res.json();
+          showError('error-room', data?.detail?.error || 'unknown');
+          setLoading('btn-room', false);
+        }
+      } catch {
+        errEl.textContent = 'Network error. Please check your connection and try again.';
+        errEl.classList.add('visible');
+        setLoading('btn-room', false);
+      }
+    }
+
+    // ── Voucher auth ──
+    async function submitVoucher(e) {
+      e.preventDefault();
+      const f = e.target;
+      const errEl = document.getElementById('error-voucher');
+      errEl.classList.remove('visible');
+
+      if (!document.getElementById('tc-voucher').checked) {
+        errEl.textContent = 'Please accept the Terms & Conditions to continue.';
+        errEl.classList.add('visible');
+        return;
+      }
+
+      setLoading('btn-voucher', true);
+      try {
+        const res = await fetch('/auth/voucher', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: f.code.value.trim().toUpperCase(),
+            tc_accepted: true,
+          }),
+        });
+        if (res.ok) {
+          window.location.href = '/success';
+        } else {
+          const data = await res.json();
+          showError('error-voucher', data?.detail?.error || 'unknown');
+          setLoading('btn-voucher', false);
+        }
+      } catch {
+        errEl.textContent = 'Network error. Please check your connection and try again.';
+        errEl.classList.add('visible');
+        setLoading('btn-voucher', false);
+      }
+    }
+
+    // Auto-uppercase voucher input
+    document.getElementById('voucher-code').addEventListener('input', function () {
+      const pos = this.selectionStart;
+      this.value = this.value.toUpperCase();
+      this.setSelectionRange(pos, pos);
+    });
+  </script>
+</body>
+</html>
