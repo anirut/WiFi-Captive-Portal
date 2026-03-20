@@ -19,7 +19,9 @@ class VoucherType(enum.Enum):
     data = "data"
 
 class PMSAdapterType(enum.Enum):
-    opera = "opera"
+    opera = "opera"              # legacy — keep for DB compat, unused by adapters
+    opera_fias = "opera_fias"   # OPERA 5/Suite8 via FIAS TCP
+    opera_cloud = "opera_cloud" # OPERA Cloud via OHIP REST
     cloudbeds = "cloudbeds"
     mews = "mews"
     custom = "custom"
