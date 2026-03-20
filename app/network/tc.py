@@ -14,6 +14,8 @@ def _run(cmd: list[str]) -> None:
 def apply_bandwidth_limit(ip: str, up_kbps: int, down_kbps: int, wan_if: str) -> None:
     if up_kbps == 0 and down_kbps == 0:
         return
+    # Note: upload shaping (up_kbps) is not yet implemented at the tc layer.
+    # Currently only download rate is enforced via HTB class on the WAN interface.
     class_id = _ip_to_class_id(ip)
     # Add HTB class for download (traffic going TO guest = outbound on WAN)
     if down_kbps > 0:

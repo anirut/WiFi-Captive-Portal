@@ -17,9 +17,9 @@ def test_remove_bandwidth_limit_calls_tc():
     with patch("app.network.tc.subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
         remove_bandwidth_limit("192.168.1.45", wan_if="eth0")
-        assert mock_run.call_count >= 1
+        assert mock_run.call_count == 2
 
-def test_zero_kbps_skips_tc(caplog):
+def test_zero_kbps_skips_tc():
     with patch("app.network.tc.subprocess.run") as mock_run:
         apply_bandwidth_limit("192.168.1.45", up_kbps=0, down_kbps=0, wan_if="eth0")
         mock_run.assert_not_called()
