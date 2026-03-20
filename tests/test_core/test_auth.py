@@ -24,3 +24,19 @@ async def test_token_is_revoked_after_revoke():
     mock_redis = AsyncMock()
     mock_redis.get.return_value = b"1"
     assert await is_token_revoked(token, mock_redis)
+
+@pytest.mark.asyncio
+async def test_revoke_token_calls_redis_setex():
+    token = create_access_token({"sub": "user1"})
+    mock_redis = AsyncMock()
+    mock_redis.setex = AsyncMock()
+    await revoke_token(token, mock_redis)
+    # Must have called setex with correct key prefix and value
+    assert mock_redis.setex.called
+    call_args = mock_redis.setex.call_args
+    key = call_args[0][0]
+    ttl = call_args[0][1]
+    value = call_args[0][2]
+    assert key == f"revoked:{token}"
+    assert ttl > 0
+    assert value == "1"
