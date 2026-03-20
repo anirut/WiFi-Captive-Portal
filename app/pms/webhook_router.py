@@ -44,9 +44,13 @@ async def pms_webhook(
     if adapter_type == "opera_cloud":
         if payload.get("eventType") == "CHECKED_OUT":
             room_number = payload.get("roomNumber")
+            if room_number is None:
+                logger.warning(f"Webhook opera_cloud: CHECKED_OUT event missing roomNumber — payload: {payload}")
     elif adapter_type == "mews":
         if payload.get("Type") == "ReservationUpdated" and payload.get("State") == "Checked_out":
             room_number = payload.get("RoomNumber")
+            if room_number is None:
+                logger.warning(f"Webhook mews: Checked_out event missing RoomNumber — payload: {payload}")
 
     if room_number:
         count = await expire_sessions_for_room(db, room_number)

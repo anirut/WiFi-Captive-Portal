@@ -55,6 +55,36 @@ async def test_webhook_opera_cloud_checkout():
         app.dependency_overrides.clear()
 
 @pytest.mark.asyncio
+async def test_webhook_mews_checkout():
+    with patch("app.network.scheduler.start_scheduler"), \
+         patch("app.pms.factory.load_adapter"):
+        from app.main import app
+        from app.core.database import get_db
+
+        mock_db = _make_db_with_adapter("mews", SECRET_HASH)
+
+        async def override_get_db():
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_get_db
+        app.state.redis = AsyncMock()
+
+        import uuid
+        adapter_id = str(uuid.uuid4())
+
+        with patch("app.pms.webhook_router.expire_sessions_for_room", new_callable=AsyncMock) as mock_expire:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+                resp = await c.post(
+                    f"/internal/pms/webhook/{adapter_id}",
+                    json={"Type": "ReservationUpdated", "State": "Checked_out", "RoomNumber": "202"},
+                    headers={"X-PMS-Secret": SECRET},
+                )
+
+        assert resp.status_code == 200
+        mock_expire.assert_called_once()
+        app.dependency_overrides.clear()
+
+@pytest.mark.asyncio
 async def test_webhook_invalid_secret_returns_401():
     with patch("app.network.scheduler.start_scheduler"), \
          patch("app.pms.factory.load_adapter"):
