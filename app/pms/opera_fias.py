@@ -55,6 +55,8 @@ class OperaFIASAdapter(PMSAdapter):
 
     async def _send_recv(self, xml: str) -> str:
         """Send XML record and return response string (thread-safe)."""
+        if self._writer is None:
+            raise RuntimeError("OperaFIASAdapter not connected — call connect() first")
         async with self._lock:
             self._writer.write(xml.encode() + _CRLF)
             await self._writer.drain()

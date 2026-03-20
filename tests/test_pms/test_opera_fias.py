@@ -97,3 +97,63 @@ async def test_connect_spawns_heartbeat_task():
     mock_create_task.assert_called_once()
     call_arg = mock_create_task.call_args[0][0]
     assert inspect.isawaitable(call_arg) or inspect.iscoroutine(call_arg)
+
+
+@pytest.mark.asyncio
+async def test_get_checkouts_since_parses_dr_response():
+    adapter = OperaFIASAdapter(CONFIG)
+    mock_reader = AsyncMock()
+    mock_writer = MagicMock()
+    mock_writer.is_closing.return_value = False
+    mock_writer.drain = AsyncMock()
+    adapter._reader = mock_reader
+    adapter._writer = mock_writer
+
+    dr_response = (
+        b'<DR RoomNumber="101" DepartureDate="03-20-26"/>\r\n'
+        b'<DR RoomNumber="202" DepartureDate="03-20-26"/>\r\n'
+    )
+    mock_reader.read = AsyncMock(return_value=dr_response)
+
+    from datetime import datetime, timezone
+    since = datetime(2026, 3, 20, tzinfo=timezone.utc)
+    result = await adapter.get_checkouts_since(since)
+
+    assert isinstance(result, list)
+    assert "101" in result
+    assert "202" in result
+    assert len(result) == 2
+
+
+@pytest.mark.asyncio
+async def test_disconnect_cleans_up():
+    adapter = OperaFIASAdapter(CONFIG)
+    mock_writer = MagicMock()
+    mock_writer.drain = AsyncMock()
+    mock_writer.close = MagicMock()
+    adapter._writer = mock_writer
+    adapter._reader = AsyncMock()
+
+    await adapter.disconnect()
+
+    assert adapter._writer is None
+    assert adapter._reader is None
+    mock_writer.write.assert_called()
+    written = b"".join(call.args[0] for call in mock_writer.write.call_args_list)
+    assert b"<LD/>" in written
+
+
+@pytest.mark.asyncio
+async def test_disconnect_cleans_up_even_if_drain_raises():
+    adapter = OperaFIASAdapter(CONFIG)
+    mock_writer = MagicMock()
+    mock_writer.drain = AsyncMock(side_effect=ConnectionResetError("connection reset"))
+    mock_writer.close = MagicMock()
+    adapter._writer = mock_writer
+    adapter._reader = AsyncMock()
+
+    # Should not raise even if drain() fails
+    await adapter.disconnect()
+
+    assert adapter._writer is None
+    assert adapter._reader is None
