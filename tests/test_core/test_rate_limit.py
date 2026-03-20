@@ -45,4 +45,4 @@ async def test_expire_called_on_first_increment():
     mock_redis.expire = AsyncMock()
     await check_rate_limit("192.168.1.45", mock_redis, max_attempts=5, window_seconds=600)
     # expire should be called with the right key and window
-    mock_redis.expire.assert_called_once()
+    mock_redis.expire.assert_called_once_with("rate_limit:auth:192.168.1.45", 600)
