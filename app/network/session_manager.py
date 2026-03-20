@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.core.models import Session, SessionStatus
+from app.core.models import Session, SessionStatus, Guest
 from app.network.iptables import add_whitelist, remove_whitelist
 from app.network.tc import apply_bandwidth_limit, remove_bandwidth_limit
 from app.network.arp import get_mac_for_ip
@@ -47,6 +47,21 @@ class SessionManager:
         session.status = status
         await db.commit()
         logger.info(f"Session {session.id} expired ({status.value})")
+
+    async def expire_sessions_for_room(self, db: AsyncSession, room_number: str) -> int:
+        """Expire all active sessions for guests in the given room number."""
+        result = await db.execute(
+            select(Session)
+            .join(Guest, Session.guest_id == Guest.id)
+            .where(
+                Guest.room_number == room_number,
+                Session.status == SessionStatus.active,
+            )
+        )
+        sessions = result.scalars().all()
+        for s in sessions:
+            await self.expire_session(db, s)
+        return len(sessions)
 
     async def expire_overdue_sessions(self, db: AsyncSession) -> int:
         result = await db.execute(
