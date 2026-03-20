@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
@@ -22,6 +22,6 @@ async def kick_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)
     result = await db.execute(select(Session).where(Session.id == session_id))
     session = result.scalar_one_or_none()
     if not session:
-        return {"error": "not_found"}
+        raise HTTPException(status_code=404, detail="not_found")
     await session_manager.expire_session(db, session, SessionStatus.kicked)
     return {"status": "kicked"}

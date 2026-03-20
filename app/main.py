@@ -11,7 +11,7 @@ from app.network.scheduler import start_scheduler, stop_scheduler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    app.state.redis = aioredis.from_url(settings.REDIS_URL, decode_responses=False)
+    app.state.redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     start_scheduler()
     yield
     # Shutdown
