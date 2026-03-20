@@ -23,8 +23,6 @@ htmlcov/
 dist/
 build/
 
-# Alembic
-alembic/versions/*.py
 
 # Git worktrees
 .worktrees/
