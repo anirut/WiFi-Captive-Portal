@@ -3,8 +3,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.pms.factory import load_adapter, get_adapter
 from app.pms.standalone import StandaloneAdapter
 from app.pms.cloudbeds import CloudbedsAdapter
+from app.pms.opera_fias import OperaFIASAdapter
 from app.core.models import PMSAdapterType
 from app.core.encryption import encrypt_config
+
+
+@pytest.fixture(autouse=True)
+def reset_active_adapter():
+    import app.pms.factory as factory_mod
+    factory_mod._active_adapter = None
+    yield
+    factory_mod._active_adapter = None
 
 
 def _make_db_mock(adapter_type, config_dict):
@@ -61,3 +70,29 @@ async def test_get_adapter_returns_standalone_if_never_loaded():
     factory_mod._active_adapter = None
     adapter = get_adapter()
     assert isinstance(adapter, StandaloneAdapter)
+
+
+@pytest.mark.asyncio
+async def test_load_adapter_opera_fias_calls_connect():
+    config = {"host": "10.0.0.1", "port": "5000", "auth_key": "k", "vendor_id": "v"}
+    mock_db = _make_db_mock(PMSAdapterType.opera_fias, config)
+
+    with patch.object(OperaFIASAdapter, "connect", new_callable=AsyncMock) as mock_connect, \
+         patch.object(OperaFIASAdapter, "health_check", new_callable=AsyncMock, return_value=True):
+        adapter = await load_adapter(mock_db)
+
+    mock_connect.assert_called_once()
+    assert isinstance(adapter, OperaFIASAdapter)
+
+
+@pytest.mark.asyncio
+async def test_load_adapter_opera_fias_connect_exception_swallowed():
+    config = {"host": "10.0.0.1", "port": "5000", "auth_key": "k", "vendor_id": "v"}
+    mock_db = _make_db_mock(PMSAdapterType.opera_fias, config)
+
+    with patch.object(OperaFIASAdapter, "connect", new_callable=AsyncMock, side_effect=ConnectionRefusedError("refused")), \
+         patch.object(OperaFIASAdapter, "health_check", new_callable=AsyncMock, return_value=False), \
+         patch("app.pms.factory.asyncio.sleep", new_callable=AsyncMock):
+        adapter = await load_adapter(mock_db)  # must not raise
+
+    assert isinstance(adapter, OperaFIASAdapter)
