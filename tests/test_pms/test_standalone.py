@@ -12,7 +12,7 @@ def adapter():
 @pytest.mark.asyncio
 async def test_verify_guest_found(adapter):
     mock_guest = MagicMock()
-    mock_guest.pms_guest_id = str(uuid.uuid4())
+    mock_guest.id = uuid.uuid4()
     mock_guest.room_number = "101"
     mock_guest.last_name = "Smith"
     mock_guest.first_name = "John"
@@ -27,6 +27,7 @@ async def test_verify_guest_found(adapter):
     result = await adapter.verify_guest("101", "Smith", db=mock_db)
     assert isinstance(result, GuestInfo)
     assert result.room_number == "101"
+    assert result.pms_id == str(mock_guest.id)
 
 @pytest.mark.asyncio
 async def test_verify_guest_not_found(adapter):
