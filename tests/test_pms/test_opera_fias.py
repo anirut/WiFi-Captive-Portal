@@ -1,3 +1,4 @@
+import inspect
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -77,3 +78,22 @@ async def test_verify_guest_not_found_returns_none():
 
     result = await adapter.verify_guest("999", "Nobody")
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_connect_spawns_heartbeat_task():
+    config = {"host": "10.0.0.1", "port": "5000", "auth_key": "key", "vendor_id": "vendor"}
+    adapter = OperaFIASAdapter(config)
+
+    mock_reader = AsyncMock()
+    mock_writer = MagicMock()
+    mock_writer.drain = AsyncMock()
+    mock_reader.read = AsyncMock(return_value=b'<LA Status="0"/>')
+
+    with patch("app.pms.opera_fias.asyncio.open_connection", return_value=(mock_reader, mock_writer)), \
+         patch("app.pms.opera_fias.asyncio.create_task") as mock_create_task:
+        await adapter.connect()
+
+    mock_create_task.assert_called_once()
+    call_arg = mock_create_task.call_args[0][0]
+    assert inspect.isawaitable(call_arg) or inspect.iscoroutine(call_arg)
