@@ -1,0 +1,115 @@
+<h2>Authentication Flow & Network Control</h2>
+<p class="subtitle">Guest journey ตั้งแต่เชื่อม WiFi จนใช้อินเทอร์เน็ตได้</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+
+  <!-- Flow A: Room-based -->
+  <div>
+    <h3 style="color:#52b788;margin-bottom:1rem">Flow A — Room + Last Name</h3>
+    <div style="display:flex;flex-direction:column;gap:0.5rem">
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#52b788;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">1</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">Guest เชื่อม WiFi → dnsmasq ให้ IP</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#52b788;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">2</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">เปิด browser → iptables redirect port 80/443 → FastAPI portal</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#52b788;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">3</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">กรอก Room Number + Last Name + ยอมรับ T&C</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#52b788;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">4</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">FastAPI → PMS Adapter ตรวจสอบ guest กำลัง check-in จริง</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#52b788;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">5</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">ดึง policy จาก room type → สร้าง session → บันทึก IP/MAC</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#52b788;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">6</div>
+        <div style="background:#1a3a2a;border:1px solid #2d6a4f;border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1"><strong style="color:#52b788">iptables ADD</strong> IP → ACCEPT chain + bandwidth limit (tc)</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#52b788;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">7</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">Redirect ไปหน้า success → ใช้อินเทอร์เน็ตได้</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flow B: Voucher -->
+  <div>
+    <h3 style="color:#74b9ff;margin-bottom:1rem">Flow B — Voucher Code</h3>
+    <div style="display:flex;flex-direction:column;gap:0.5rem">
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#74b9ff;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">1</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">Guest เชื่อม WiFi → iptables redirect → portal</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#74b9ff;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">2</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">เลือก "Voucher Code" → กรอกรหัส</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#74b9ff;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">3</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">ตรวจสอบ: ถูกต้อง, ไม่หมดอายุ, ยังเหลือ uses</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#74b9ff;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">4</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">สร้าง session → ดึง policy จาก voucher type</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#74b9ff;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">5</div>
+        <div style="background:#1a2a3a;border:1px solid #2d4a6a;border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1"><strong style="color:#74b9ff">iptables ADD</strong> IP → ACCEPT + bandwidth limit</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:0.75rem">
+        <div style="background:#74b9ff;color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0">6</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.8rem;font-size:0.82rem;flex:1">ใช้อินเทอร์เน็ตตาม type: หมดเวลา หรือ หมด data → expire</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Session Expiry -->
+<div style="margin-top:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem">
+  <h3 style="margin-bottom:0.75rem">Session Expiry (Background Task)</h3>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;font-size:0.82rem">
+    <div style="background:#2a1a1a;border:1px solid #6a2d2d;border-radius:6px;padding:0.7rem">
+      <div class="label" style="color:#e17055;margin-bottom:0.4rem">Check-out Sync</div>
+      PMS แจ้ง check-out → FastAPI expire session ของ room นั้นทันที → iptables REMOVE
+    </div>
+    <div style="background:#1a2a1a;border:1px solid #2d6a2d;border-radius:6px;padding:0.7rem">
+      <div class="label" style="color:#55efc4;margin-bottom:0.4rem">Timer Expiry</div>
+      background scheduler ตรวจ <code>expires_at</code> ทุก 60 วิ → REMOVE ที่หมดอายุ
+    </div>
+    <div style="background:#1a1a2a;border:1px solid #2d2d6a;border-radius:6px;padding:0.7rem">
+      <div class="label" style="color:#74b9ff;margin-bottom:0.4rem">Manual Kick</div>
+      Admin กด kick จาก dashboard → iptables REMOVE ทันที → session status = kicked
+    </div>
+  </div>
+</div>
+
+<!-- iptables Rules -->
+<div style="margin-top:1rem;background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:1rem;font-family:monospace;font-size:0.78rem;color:#a0a0a0">
+  <div class="label" style="margin-bottom:0.5rem">iptables Rules Overview</div>
+  <div style="color:#52b788"># Redirect unauthenticated traffic to portal</div>
+  <div>iptables -t nat -A PREROUTING -i wlan0 -p tcp --dport 80 -j DNAT --to 192.168.1.1:8080</div>
+  <div style="margin-top:0.5rem;color:#52b788"># Allow authenticated IP (added per session)</div>
+  <div>iptables -I FORWARD -s &lt;guest_ip&gt; -j ACCEPT</div>
+  <div style="margin-top:0.5rem;color:#52b788"># Remove on expire/kick</div>
+  <div>iptables -D FORWARD -s &lt;guest_ip&gt; -j ACCEPT</div>
+</div>

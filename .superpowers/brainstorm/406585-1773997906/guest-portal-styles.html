@@ -1,0 +1,120 @@
+<h2>Guest Portal — เลือก Layout</h2>
+<p class="subtitle">หน้าที่แขกเห็นเมื่อเชื่อม WiFi — ต้องเข้าใจง่าย ใช้งานได้เร็ว บน mobile เป็นหลัก</p>
+
+<div class="cards">
+
+  <!-- Option A: Centered Card -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;border-radius:6px 6px 0 0">
+      <div style="background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);height:240px;display:flex;align-items:center;justify-content:center;position:relative">
+        <div style="position:absolute;width:120px;height:120px;background:rgba(99,102,241,0.25);border-radius:50%;top:-20px;left:-20px;filter:blur(30px)"></div>
+        <div style="position:absolute;width:80px;height:80px;background:rgba(16,185,129,0.2);border-radius:50%;bottom:10px;right:10px;filter:blur(20px)"></div>
+        <!-- Card -->
+        <div style="background:rgba(255,255,255,0.08);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:1.25rem;width:180px;text-align:center">
+          <div style="font-size:1rem;margin-bottom:0.3rem">🏨</div>
+          <div style="color:#fff;font-weight:700;font-size:0.85rem;margin-bottom:0.15rem">Grand Hotel</div>
+          <div style="color:rgba(255,255,255,0.5);font-size:0.65rem;margin-bottom:0.9rem">Welcome — Please sign in</div>
+          <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:0.35rem 0.5rem;color:rgba(255,255,255,0.5);font-size:0.65rem;text-align:left;margin-bottom:0.35rem">Room Number</div>
+          <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:0.35rem 0.5rem;color:rgba(255,255,255,0.5);font-size:0.65rem;text-align:left;margin-bottom:0.6rem">Last Name</div>
+          <div style="background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:6px;padding:0.4rem;color:#fff;font-size:0.7rem;font-weight:600">Connect →</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Centered Card</h3>
+      <p>Card กลางจอ simple ที่สุด เข้าใจได้ทันที เหมาะทุก device ทำได้เร็ว</p>
+    </div>
+  </div>
+
+  <!-- Option B: Full Split -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;border-radius:6px 6px 0 0">
+      <div style="background:linear-gradient(135deg,#0d1b2a,#1b2d45);height:240px;display:grid;grid-template-columns:1fr 1fr;position:relative">
+        <div style="position:absolute;width:100px;height:100px;background:rgba(226,194,125,0.15);border-radius:50%;top:20px;left:20px;filter:blur(25px)"></div>
+        <!-- Left: Branding -->
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem;border-right:1px solid rgba(255,255,255,0.08)">
+          <div style="font-size:1.5rem;margin-bottom:0.5rem">🏨</div>
+          <div style="color:#e2c27d;font-weight:700;font-size:0.9rem;text-align:center">Grand Hotel</div>
+          <div style="color:rgba(255,255,255,0.35);font-size:0.62rem;text-align:center;margin-top:0.3rem">Complimentary WiFi</div>
+          <div style="margin-top:0.75rem;width:40px;height:1px;background:rgba(226,194,125,0.3)"></div>
+          <div style="color:rgba(255,255,255,0.25);font-size:0.58rem;text-align:center;margin-top:0.5rem">Speed: 50 Mbps<br>Duration: Stay</div>
+        </div>
+        <!-- Right: Form -->
+        <div style="display:flex;flex-direction:column;justify-content:center;padding:1rem">
+          <div style="color:rgba(255,255,255,0.8);font-size:0.75rem;font-weight:600;margin-bottom:0.75rem">Sign In</div>
+          <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:5px;padding:0.3rem 0.45rem;color:rgba(255,255,255,0.4);font-size:0.62rem;margin-bottom:0.3rem">Room Number</div>
+          <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:5px;padding:0.3rem 0.45rem;color:rgba(255,255,255,0.4);font-size:0.62rem;margin-bottom:0.5rem">Last Name</div>
+          <div style="text-align:right;margin-bottom:0.5rem"><span style="color:#e2c27d;font-size:0.6rem">Use Voucher instead →</span></div>
+          <div style="background:linear-gradient(90deg,#b8860b,#e2c27d);border-radius:5px;padding:0.35rem;color:#0d1b2a;font-size:0.65rem;font-weight:700;text-align:center">Connect</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Split Branding + Form</h3>
+      <p>แบ่งครึ่ง ซ้ายแสดงโลโก้/ข้อมูล WiFi ขวาเป็น form เหมาะ tablet/desktop โชว์แบรนด์</p>
+    </div>
+  </div>
+
+  <!-- Option C: Mobile-first Fullscreen -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;border-radius:6px 6px 0 0">
+      <div style="background:linear-gradient(160deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%);height:240px;display:flex;justify-content:center;align-items:flex-start;padding-top:0.75rem;position:relative">
+        <div style="position:absolute;width:150px;height:150px;background:rgba(99,102,241,0.2);border-radius:50%;top:-30px;right:-30px;filter:blur(35px)"></div>
+        <!-- Phone mockup -->
+        <div style="width:110px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:0.75rem;backdrop-filter:blur(10px)">
+          <div style="text-align:center;margin-bottom:0.6rem">
+            <div style="font-size:0.85rem">🏨</div>
+            <div style="color:#fff;font-weight:700;font-size:0.7rem">Grand Hotel</div>
+            <div style="color:rgba(255,255,255,0.4);font-size:0.55rem">Free WiFi</div>
+          </div>
+          <!-- Tab switcher -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,0.2);border-radius:6px;padding:2px;margin-bottom:0.5rem">
+            <div style="background:rgba(255,255,255,0.15);border-radius:4px;padding:0.2rem;text-align:center;color:#fff;font-size:0.55rem">Room</div>
+            <div style="padding:0.2rem;text-align:center;color:rgba(255,255,255,0.35);font-size:0.55rem">Voucher</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:0.25rem 0.4rem;color:rgba(255,255,255,0.4);font-size:0.55rem;margin-bottom:0.25rem">Room Number</div>
+          <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:0.25rem 0.4rem;color:rgba(255,255,255,0.4);font-size:0.55rem;margin-bottom:0.4rem">Last Name</div>
+          <div style="background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:4px;padding:0.3rem;color:#fff;font-size:0.6rem;font-weight:600;text-align:center">Connect</div>
+          <div style="color:rgba(255,255,255,0.25);font-size:0.5rem;text-align:center;margin-top:0.4rem">By connecting you agree to our Terms</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Mobile-first + Tab Switch</h3>
+      <p>ออกแบบเพื่อมือถือโดยตรง tab สลับ Room/Voucher ใน card เดียว UX กระชับที่สุด</p>
+    </div>
+  </div>
+
+  <!-- Option D: Immersive Fullscreen -->
+  <div class="card" data-choice="d" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;border-radius:6px 6px 0 0">
+      <div style="height:240px;position:relative;overflow:hidden">
+        <!-- BG image simulation -->
+        <div style="position:absolute;inset:0;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364)"></div>
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,0.45)"></div>
+        <!-- Decorative circles -->
+        <div style="position:absolute;width:200px;height:200px;background:rgba(255,255,255,0.03);border-radius:50%;top:-60px;left:-60px;border:1px solid rgba(255,255,255,0.06)"></div>
+        <div style="position:absolute;width:150px;height:150px;background:rgba(255,255,255,0.02);border-radius:50%;bottom:-40px;right:-40px;border:1px solid rgba(255,255,255,0.05)"></div>
+        <!-- Content -->
+        <div style="position:relative;z-index:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem">
+          <div style="font-size:1.2rem;margin-bottom:0.4rem">🏨</div>
+          <div style="color:#fff;font-weight:800;font-size:1rem;letter-spacing:0.05em;margin-bottom:0.15rem">GRAND HOTEL</div>
+          <div style="color:rgba(255,255,255,0.4);font-size:0.6rem;letter-spacing:0.1em;margin-bottom:1rem">COMPLIMENTARY WIFI</div>
+          <div style="width:160px">
+            <div style="background:rgba(255,255,255,0.1);border-bottom:1px solid rgba(255,255,255,0.3);padding:0.3rem 0.1rem;color:rgba(255,255,255,0.5);font-size:0.62rem;margin-bottom:0.4rem">Room Number</div>
+            <div style="background:rgba(255,255,255,0.1);border-bottom:1px solid rgba(255,255,255,0.3);padding:0.3rem 0.1rem;color:rgba(255,255,255,0.5);font-size:0.62rem;margin-bottom:0.75rem">Last Name</div>
+            <div style="background:rgba(255,255,255,0.9);border-radius:3px;padding:0.35rem;color:#111;font-size:0.65rem;font-weight:700;text-align:center;letter-spacing:0.05em">CONNECT</div>
+          </div>
+          <div style="color:rgba(255,255,255,0.2);font-size:0.52rem;margin-top:0.6rem">Voucher Code</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>D — Immersive Fullscreen</h3>
+      <p>เต็มจอ underline inputs สไตล์ luxury hotel ดูหรูมาก รองรับ background photo</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:1rem;text-align:center">คลิกเลือก layout ที่ชอบ — ทุกแบบเป็น Glassmorphism theme ตามที่เลือกไว้</p>

@@ -1,0 +1,103 @@
+<h2>PMS Adapter Layer</h2>
+<p class="subtitle">Abstraction interface รองรับหลาย PMS — เพิ่ม adapter ใหม่ได้โดยไม่แก้ core logic</p>
+
+<div style="margin-bottom:1.5rem">
+  <h3 style="margin-bottom:0.75rem">Interface Contract (Abstract Base Class)</h3>
+  <div style="background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:1rem;font-family:monospace;font-size:0.8rem;color:#a0a0a0">
+    <div style="color:#c39bd3">class</div> <div style="display:inline;color:#74b9ff">PMSAdapter</div><div style="display:inline;color:#aaa">(ABC):</div>
+    <div style="margin-top:0.75rem;padding-left:1.5rem">
+      <div style="color:#666"># ทุก adapter ต้อง implement 3 methods นี้</div>
+      <div style="margin-top:0.4rem"><span style="color:#f0a500">async def</span> <span style="color:#52b788">verify_guest</span>(room: str, last_name: str) → <span style="color:#74b9ff">GuestInfo | None</span></div>
+      <div style="color:#666;font-size:0.75rem;padding-left:1rem">→ ตรวจสอบว่า guest check-in อยู่จริง, คืน GuestInfo ถ้าถูก</div>
+      <div style="margin-top:0.4rem"><span style="color:#f0a500">async def</span> <span style="color:#52b788">get_guest_by_room</span>(room: str) → <span style="color:#74b9ff">GuestInfo | None</span></div>
+      <div style="color:#666;font-size:0.75rem;padding-left:1rem">→ ดึงข้อมูล guest ปัจจุบันใน room</div>
+      <div style="margin-top:0.4rem"><span style="color:#f0a500">async def</span> <span style="color:#52b788">health_check</span>() → <span style="color:#74b9ff">bool</span></div>
+      <div style="color:#666;font-size:0.75rem;padding-left:1rem">→ ตรวจสอบ connectivity กับ PMS</div>
+    </div>
+    <div style="margin-top:0.75rem;color:#666"># GuestInfo dataclass</div>
+    <div><span style="color:#c39bd3">@dataclass</span></div>
+    <div><span style="color:#c39bd3">class</span> <span style="color:#74b9ff">GuestInfo</span>:</div>
+    <div style="padding-left:1.5rem">
+      <div>pms_id: <span style="color:#f0a500">str</span></div>
+      <div>room_number: <span style="color:#f0a500">str</span></div>
+      <div>last_name: <span style="color:#f0a500">str</span></div>
+      <div>check_in: <span style="color:#f0a500">datetime</span></div>
+      <div>check_out: <span style="color:#f0a500">datetime</span></div>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.5rem">
+
+  <div style="background:var(--surface);border:1px solid #7a5a2d;border-radius:8px;padding:0.9rem">
+    <div class="label" style="color:#f0a500;margin-bottom:0.5rem">Opera / OHIP Adapter</div>
+    <div style="font-size:0.8rem;color:var(--text-secondary)">
+      เชื่อม Oracle Hospitality REST API<br>
+      OAuth2 authentication<br>
+      Real-time guest lookup<br>
+      <span style="color:#e17055">config:</span> hotel_id, api_key, base_url
+    </div>
+  </div>
+
+  <div style="background:var(--surface);border:1px solid #2d4a6a;border-radius:8px;padding:0.9rem">
+    <div class="label" style="color:#74b9ff;margin-bottom:0.5rem">Cloudbeds Adapter</div>
+    <div style="font-size:0.8rem;color:var(--text-secondary)">
+      Cloudbeds REST API v1<br>
+      API key auth<br>
+      Guest + reservation lookup<br>
+      <span style="color:#e17055">config:</span> property_id, api_key
+    </div>
+  </div>
+
+  <div style="background:var(--surface);border:1px solid #2d4a6a;border-radius:8px;padding:0.9rem">
+    <div class="label" style="color:#74b9ff;margin-bottom:0.5rem">Mews Adapter</div>
+    <div style="font-size:0.8rem;color:var(--text-secondary)">
+      Mews Connector API<br>
+      Access token auth<br>
+      Reservation verification<br>
+      <span style="color:#e17055">config:</span> client_token, access_token
+    </div>
+  </div>
+
+  <div style="background:var(--surface);border:1px solid #555;border-radius:8px;padding:0.9rem">
+    <div class="label" style="color:#aaa;margin-bottom:0.5rem">Custom REST Adapter</div>
+    <div style="font-size:0.8rem;color:var(--text-secondary)">
+      เชื่อม PMS ภายในที่มี REST API<br>
+      config กำหนด endpoint + field mapping<br>
+      รองรับ Bearer / Basic auth<br>
+      <span style="color:#e17055">config:</span> base_url, auth, field_map (JSON)
+    </div>
+  </div>
+
+  <div style="background:var(--surface);border:1px solid #2d6a4f;border-radius:8px;padding:0.9rem">
+    <div class="label" style="color:#52b788;margin-bottom:0.5rem">Standalone Adapter</div>
+    <div style="font-size:0.8rem;color:var(--text-secondary)">
+      ไม่มี PMS — จัดการ guest ใน DB เอง<br>
+      Admin เพิ่ม/แก้ guest ผ่าน dashboard<br>
+      เหมาะสำหรับ hotel เล็ก<br>
+      <span style="color:#55efc4">ไม่ต้องมี external dependency</span>
+    </div>
+  </div>
+
+  <div style="background:#1a1a2a;border:1px dashed #555;border-radius:8px;padding:0.9rem;display:flex;align-items:center;justify-content:center">
+    <div style="text-align:center;color:var(--text-secondary);font-size:0.8rem">
+      <div style="font-size:1.5rem;margin-bottom:0.4rem">+</div>
+      เพิ่ม adapter ใหม่ได้<br>โดย implement<br>PMSAdapter interface
+    </div>
+  </div>
+
+</div>
+
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:0.82rem">
+  <h3 style="margin-bottom:0.6rem">Adapter Factory & Fallback</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+    <div>
+      <div class="label" style="margin-bottom:0.4rem">Factory Pattern</div>
+      <div style="color:var(--text-secondary)">โหลด adapter จาก <code>pms_adapters</code> table ที่ <code>is_active=true</code> → inject เข้า auth service ตอน startup</div>
+    </div>
+    <div>
+      <div class="label" style="margin-bottom:0.4rem">Fallback Strategy</div>
+      <div style="color:var(--text-secondary)">PMS timeout/error → retry 2 ครั้ง → log error → คืน auth failure พร้อม error message ชัดเจน (ไม่ fallback เงียบ)</div>
+    </div>
+  </div>
+</div>

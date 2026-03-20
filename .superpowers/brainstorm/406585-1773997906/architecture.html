@@ -1,0 +1,108 @@
+<h2>System Architecture — WiFi Captive Portal (Hotel)</h2>
+<p class="subtitle">Modular Monolith บน Ubuntu Linux + Python FastAPI</p>
+
+<div class="section" style="margin-bottom:2rem">
+
+  <!-- Network Layer -->
+  <h3 style="margin-bottom:0.75rem">Network Layer (Ubuntu Linux)</h3>
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem">
+    <div style="flex:1;min-width:160px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem">
+      <div class="label">dnsmasq</div>
+      <div style="font-size:0.85rem;margin-top:0.4rem;color:var(--text-secondary)">DHCP + DNS redirect<br>→ portal IP</div>
+    </div>
+    <div style="flex:1;min-width:160px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem">
+      <div class="label">iptables / nftables</div>
+      <div style="font-size:0.85rem;margin-top:0.4rem;color:var(--text-secondary)">Redirect port 80/443<br>Whitelist IP/MAC ที่ผ่าน auth</div>
+    </div>
+    <div style="flex:1;min-width:160px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem">
+      <div class="label">Session Tracker</div>
+      <div style="font-size:0.85rem;margin-top:0.4rem;color:var(--text-secondary)">ติดตาม IP/MAC<br>expire session อัตโนมัติ</div>
+    </div>
+  </div>
+
+  <!-- App Layer -->
+  <h3 style="margin-bottom:0.75rem">Application Layer (FastAPI Modular Monolith)</h3>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.5rem">
+
+    <div style="background:#1a3a2a;border:1px solid #2d6a4f;border-radius:8px;padding:0.85rem">
+      <div class="label" style="color:#52b788">portal/</div>
+      <div style="font-size:0.8rem;margin-top:0.5rem;color:var(--text-secondary)">
+        หน้า login แขก<br>
+        Room + Last name<br>
+        Voucher code<br>
+        T&C acceptance
+      </div>
+    </div>
+
+    <div style="background:#1a2a3a;border:1px solid #2d4a6a;border-radius:8px;padding:0.85rem">
+      <div class="label" style="color:#74b9ff">admin/</div>
+      <div style="font-size:0.8rem;margin-top:0.5rem;color:var(--text-secondary)">
+        Dashboard<br>
+        Session management<br>
+        Analytics & reports<br>
+        Brand config
+      </div>
+    </div>
+
+    <div style="background:#2a1a3a;border:1px solid #5a2d7a;border-radius:8px;padding:0.85rem">
+      <div class="label" style="color:#c39bd3">network/</div>
+      <div style="font-size:0.8rem;margin-top:0.5rem;color:var(--text-secondary)">
+        iptables manager<br>
+        Whitelist add/remove<br>
+        Bandwidth control<br>
+        Session expiry
+      </div>
+    </div>
+
+    <div style="background:#3a2a1a;border:1px solid #7a5a2d;border-radius:8px;padding:0.85rem">
+      <div class="label" style="color:#f0a500">pms/</div>
+      <div style="font-size:0.8rem;margin-top:0.5rem;color:var(--text-secondary)">
+        Adapter interface<br>
+        Opera / OHIP<br>
+        Cloudbeds / Mews<br>
+        Custom REST / Standalone
+      </div>
+    </div>
+
+    <div style="background:#2a3a1a;border:1px solid #5a7a2d;border-radius:8px;padding:0.85rem">
+      <div class="label" style="color:#a8d5a2">voucher/</div>
+      <div style="font-size:0.8rem;margin-top:0.5rem;color:var(--text-secondary)">
+        สร้าง/จัดการ voucher<br>
+        Time-based / Data-limited<br>
+        Print/export
+      </div>
+    </div>
+
+    <div style="background:#2a2a2a;border:1px solid #555;border-radius:8px;padding:0.85rem">
+      <div class="label" style="color:#aaa">core/</div>
+      <div style="font-size:0.8rem;margin-top:0.5rem;color:var(--text-secondary)">
+        DB models (SQLAlchemy)<br>
+        Auth & session tokens<br>
+        Config management<br>
+        Shared utilities
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Data Layer -->
+  <h3 style="margin-bottom:0.75rem">Data Layer</h3>
+  <div style="display:flex;gap:1rem;flex-wrap:wrap">
+    <div style="flex:1;min-width:140px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem">
+      <div class="label">PostgreSQL</div>
+      <div style="font-size:0.8rem;margin-top:0.4rem;color:var(--text-secondary)">guests, sessions,<br>vouchers, rooms,<br>policies, adapters</div>
+    </div>
+    <div style="flex:1;min-width:140px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem">
+      <div class="label">Redis (optional)</div>
+      <div style="font-size:0.8rem;margin-top:0.4rem;color:var(--text-secondary)">Active session cache<br>Rate limiting<br>Fast IP lookup</div>
+    </div>
+    <div style="flex:1;min-width:140px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem">
+      <div class="label">PMS Systems</div>
+      <div style="font-size:0.8rem;margin-top:0.4rem;color:var(--text-secondary)">Opera, Cloudbeds,<br>Mews, Custom,<br>Standalone</div>
+    </div>
+  </div>
+</div>
+
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:0.85rem;color:var(--text-secondary)">
+  <strong>Network Flow:</strong> Guest เชื่อม WiFi → dnsmasq ให้ IP → browser เปิด → iptables redirect → FastAPI portal → authenticate → iptables เพิ่ม whitelist → อินเทอร์เน็ต ✓
+</div>

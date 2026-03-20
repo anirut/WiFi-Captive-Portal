@@ -1,0 +1,208 @@
+<h2>Admin Dashboard — เลือก Design Style</h2>
+<p class="subtitle">เลือก 1 แบบที่ชอบ หรือผสมหลายแบบได้</p>
+
+<div class="cards">
+
+  <!-- Option A: Dark Professional -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;background:#0f0f0f;border-radius:6px 6px 0 0">
+      <div style="display:grid;grid-template-columns:180px 1fr;height:220px;font-size:0.7rem">
+        <!-- Sidebar -->
+        <div style="background:#111;border-right:1px solid #222;padding:0.75rem">
+          <div style="color:#52b788;font-weight:700;margin-bottom:0.75rem;font-size:0.8rem">HotelNet</div>
+          <div style="background:#1a3a2a;border-radius:4px;padding:0.35rem 0.5rem;color:#52b788;margin-bottom:0.25rem">Dashboard</div>
+          <div style="padding:0.35rem 0.5rem;color:#555">Sessions</div>
+          <div style="padding:0.35rem 0.5rem;color:#555">Vouchers</div>
+          <div style="padding:0.35rem 0.5rem;color:#555">Rooms</div>
+          <div style="padding:0.35rem 0.5rem;color:#555">Analytics</div>
+          <div style="padding:0.35rem 0.5rem;color:#555">Settings</div>
+        </div>
+        <!-- Main -->
+        <div style="background:#141414;padding:0.75rem">
+          <div style="color:#eee;font-size:0.85rem;font-weight:600;margin-bottom:0.6rem">Overview</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.4rem;margin-bottom:0.6rem">
+            <div style="background:#1a1a1a;border:1px solid #222;border-radius:4px;padding:0.4rem;text-align:center">
+              <div style="color:#52b788;font-size:1rem;font-weight:700">47</div>
+              <div style="color:#555;font-size:0.65rem">Online</div>
+            </div>
+            <div style="background:#1a1a1a;border:1px solid #222;border-radius:4px;padding:0.4rem;text-align:center">
+              <div style="color:#74b9ff;font-size:1rem;font-weight:700">12</div>
+              <div style="color:#555;font-size:0.65rem">Vouchers</div>
+            </div>
+            <div style="background:#1a1a1a;border:1px solid #222;border-radius:4px;padding:0.4rem;text-align:center">
+              <div style="color:#f0a500;font-size:1rem;font-weight:700">82%</div>
+              <div style="color:#555;font-size:0.65rem">Occupancy</div>
+            </div>
+          </div>
+          <div style="background:#1a1a1a;border:1px solid #222;border-radius:4px;padding:0.5rem">
+            <div style="color:#888;font-size:0.65rem;margin-bottom:0.3rem">ACTIVE SESSIONS</div>
+            <div style="display:flex;justify-content:space-between;color:#aaa;font-size:0.65rem;padding:0.2rem 0;border-bottom:1px solid #222">
+              <span>Room 101 — Smith</span><span style="color:#e17055">Kick</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;color:#aaa;font-size:0.65rem;padding:0.2rem 0">
+              <span>Room 205 — Johnson</span><span style="color:#e17055">Kick</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Dark Professional</h3>
+      <p>โทนเข้ม สไตล์ IT ops — อ่านง่ายในห้องมืด, contrast ชัด, ดูเป็น technical</p>
+    </div>
+  </div>
+
+  <!-- Option B: Light Clean -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;background:#f5f6fa;border-radius:6px 6px 0 0">
+      <div style="display:grid;grid-template-columns:180px 1fr;height:220px;font-size:0.7rem">
+        <!-- Sidebar -->
+        <div style="background:#fff;border-right:1px solid #e8e8e8;padding:0.75rem;box-shadow:2px 0 8px rgba(0,0,0,0.05)">
+          <div style="color:#2563eb;font-weight:700;margin-bottom:0.75rem;font-size:0.8rem">HotelNet</div>
+          <div style="background:#eff6ff;border-radius:4px;padding:0.35rem 0.5rem;color:#2563eb;margin-bottom:0.25rem">Dashboard</div>
+          <div style="padding:0.35rem 0.5rem;color:#9ca3af">Sessions</div>
+          <div style="padding:0.35rem 0.5rem;color:#9ca3af">Vouchers</div>
+          <div style="padding:0.35rem 0.5rem;color:#9ca3af">Rooms</div>
+          <div style="padding:0.35rem 0.5rem;color:#9ca3af">Analytics</div>
+          <div style="padding:0.35rem 0.5rem;color:#9ca3af">Settings</div>
+        </div>
+        <!-- Main -->
+        <div style="background:#f5f6fa;padding:0.75rem">
+          <div style="color:#111827;font-size:0.85rem;font-weight:600;margin-bottom:0.6rem">Good morning, Admin</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.4rem;margin-bottom:0.6rem">
+            <div style="background:#fff;border-radius:6px;padding:0.4rem;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+              <div style="color:#16a34a;font-size:1rem;font-weight:700">47</div>
+              <div style="color:#9ca3af;font-size:0.65rem">Online</div>
+            </div>
+            <div style="background:#fff;border-radius:6px;padding:0.4rem;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+              <div style="color:#2563eb;font-size:1rem;font-weight:700">12</div>
+              <div style="color:#9ca3af;font-size:0.65rem">Vouchers</div>
+            </div>
+            <div style="background:#fff;border-radius:6px;padding:0.4rem;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+              <div style="color:#d97706;font-size:1rem;font-weight:700">82%</div>
+              <div style="color:#9ca3af;font-size:0.65rem">Occupancy</div>
+            </div>
+          </div>
+          <div style="background:#fff;border-radius:6px;padding:0.5rem;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+            <div style="color:#9ca3af;font-size:0.65rem;margin-bottom:0.3rem">ACTIVE SESSIONS</div>
+            <div style="display:flex;justify-content:space-between;color:#374151;font-size:0.65rem;padding:0.2rem 0;border-bottom:1px solid #f3f4f6">
+              <span>Room 101 — Smith</span><span style="color:#dc2626">Kick</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;color:#374151;font-size:0.65rem;padding:0.2rem 0">
+              <span>Room 205 — Johnson</span><span style="color:#dc2626">Kick</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Light & Clean</h3>
+      <p>โทนสว่าง ดูเป็นมืออาชีพ เหมาะกับ front desk ใช้กลางวัน อ่านง่าย ไม่เครียดตา</p>
+    </div>
+  </div>
+
+  <!-- Option C: Dark Navy Premium -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;background:#0d1b2a;border-radius:6px 6px 0 0">
+      <div style="display:grid;grid-template-columns:180px 1fr;height:220px;font-size:0.7rem">
+        <!-- Sidebar -->
+        <div style="background:#1b2d45;padding:0.75rem">
+          <div style="color:#e2c27d;font-weight:700;margin-bottom:0.75rem;font-size:0.8rem">✦ HotelNet</div>
+          <div style="background:rgba(226,194,125,0.15);border-left:2px solid #e2c27d;padding:0.35rem 0.5rem;color:#e2c27d;margin-bottom:0.25rem">Dashboard</div>
+          <div style="padding:0.35rem 0.5rem;color:#4a6785">Sessions</div>
+          <div style="padding:0.35rem 0.5rem;color:#4a6785">Vouchers</div>
+          <div style="padding:0.35rem 0.5rem;color:#4a6785">Rooms</div>
+          <div style="padding:0.35rem 0.5rem;color:#4a6785">Analytics</div>
+          <div style="padding:0.35rem 0.5rem;color:#4a6785">Settings</div>
+        </div>
+        <!-- Main -->
+        <div style="background:#0d1b2a;padding:0.75rem">
+          <div style="color:#e2c27d;font-size:0.85rem;font-weight:600;margin-bottom:0.6rem">Network Overview</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.4rem;margin-bottom:0.6rem">
+            <div style="background:#1b2d45;border:1px solid #243c59;border-radius:4px;padding:0.4rem;text-align:center">
+              <div style="color:#4ade80;font-size:1rem;font-weight:700">47</div>
+              <div style="color:#4a6785;font-size:0.65rem">Online</div>
+            </div>
+            <div style="background:#1b2d45;border:1px solid #243c59;border-radius:4px;padding:0.4rem;text-align:center">
+              <div style="color:#60a5fa;font-size:1rem;font-weight:700">12</div>
+              <div style="color:#4a6785;font-size:0.65rem">Vouchers</div>
+            </div>
+            <div style="background:#1b2d45;border:1px solid #243c59;border-radius:4px;padding:0.4rem;text-align:center">
+              <div style="color:#e2c27d;font-size:1rem;font-weight:700">82%</div>
+              <div style="color:#4a6785;font-size:0.65rem">Occupancy</div>
+            </div>
+          </div>
+          <div style="background:#1b2d45;border:1px solid #243c59;border-radius:4px;padding:0.5rem">
+            <div style="color:#4a6785;font-size:0.65rem;margin-bottom:0.3rem">LIVE SESSIONS</div>
+            <div style="display:flex;justify-content:space-between;color:#8ba3bf;font-size:0.65rem;padding:0.2rem 0;border-bottom:1px solid #243c59">
+              <span>Room 101 — Smith</span><span style="color:#f87171">Kick</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;color:#8ba3bf;font-size:0.65rem;padding:0.2rem 0">
+              <span>Room 205 — Johnson</span><span style="color:#f87171">Kick</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Navy Premium</h3>
+      <p>โทน navy + gold ดูหรูหรา เหมาะกับโรงแรม 4-5 ดาว สไตล์ elegant แต่ยังอ่านง่าย</p>
+    </div>
+  </div>
+
+  <!-- Option D: Glassmorphism -->
+  <div class="card" data-choice="d" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;overflow:hidden;border-radius:6px 6px 0 0;position:relative">
+      <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);height:220px;position:relative">
+        <!-- blur circles -->
+        <div style="position:absolute;width:80px;height:80px;background:rgba(99,102,241,0.3);border-radius:50%;top:10px;left:30px;filter:blur(20px)"></div>
+        <div style="position:absolute;width:60px;height:60px;background:rgba(16,185,129,0.3);border-radius:50%;top:40px;right:20px;filter:blur(15px)"></div>
+        <div style="display:grid;grid-template-columns:170px 1fr;height:100%;font-size:0.7rem;position:relative;z-index:1">
+          <!-- Sidebar glass -->
+          <div style="background:rgba(255,255,255,0.07);backdrop-filter:blur(10px);border-right:1px solid rgba(255,255,255,0.1);padding:0.75rem">
+            <div style="color:#a5b4fc;font-weight:700;margin-bottom:0.75rem;font-size:0.8rem">HotelNet</div>
+            <div style="background:rgba(165,180,252,0.15);border-radius:4px;padding:0.35rem 0.5rem;color:#a5b4fc;margin-bottom:0.25rem">Dashboard</div>
+            <div style="padding:0.35rem 0.5rem;color:rgba(255,255,255,0.3)">Sessions</div>
+            <div style="padding:0.35rem 0.5rem;color:rgba(255,255,255,0.3)">Vouchers</div>
+            <div style="padding:0.35rem 0.5rem;color:rgba(255,255,255,0.3)">Rooms</div>
+            <div style="padding:0.35rem 0.5rem;color:rgba(255,255,255,0.3)">Analytics</div>
+          </div>
+          <!-- Main glass -->
+          <div style="padding:0.75rem">
+            <div style="color:rgba(255,255,255,0.9);font-size:0.85rem;font-weight:600;margin-bottom:0.6rem">Dashboard</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.4rem;margin-bottom:0.6rem">
+              <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:0.4rem;text-align:center;backdrop-filter:blur(4px)">
+                <div style="color:#34d399;font-size:1rem;font-weight:700">47</div>
+                <div style="color:rgba(255,255,255,0.4);font-size:0.65rem">Online</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:0.4rem;text-align:center;backdrop-filter:blur(4px)">
+                <div style="color:#a5b4fc;font-size:1rem;font-weight:700">12</div>
+                <div style="color:rgba(255,255,255,0.4);font-size:0.65rem">Vouchers</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:0.4rem;text-align:center;backdrop-filter:blur(4px)">
+                <div style="color:#fbbf24;font-size:1rem;font-weight:700">82%</div>
+                <div style="color:rgba(255,255,255,0.4);font-size:0.65rem">Occupancy</div>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:0.5rem;backdrop-filter:blur(4px)">
+              <div style="color:rgba(255,255,255,0.35);font-size:0.65rem;margin-bottom:0.3rem">SESSIONS</div>
+              <div style="display:flex;justify-content:space-between;color:rgba(255,255,255,0.7);font-size:0.65rem;padding:0.2rem 0;border-bottom:1px solid rgba(255,255,255,0.08)">
+                <span>Room 101 — Smith</span><span style="color:#f87171">Kick</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;color:rgba(255,255,255,0.7);font-size:0.65rem;padding:0.2rem 0">
+                <span>Room 205 — Johnson</span><span style="color:#f87171">Kick</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>D — Glassmorphism</h3>
+      <p>โทนเข้มกับ glass effect สวยงาม ทันสมัย เหมาะกับโรงแรม boutique ที่เน้น design</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:1rem;text-align:center">คลิกเลือกแบบที่ชอบ — หรือเลือกหลายแบบเพื่อผสมกัน แล้วบอกในแชทได้เลย</p>

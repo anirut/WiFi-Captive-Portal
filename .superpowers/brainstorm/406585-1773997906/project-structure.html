@@ -1,0 +1,136 @@
+<h2>Project Structure & Tech Stack</h2>
+<p class="subtitle">Modular Monolith — Python FastAPI บน Ubuntu Linux</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+
+  <!-- File Structure -->
+  <div>
+    <h3 style="margin-bottom:0.75rem">Directory Structure</h3>
+    <div style="background:#0d0d0d;border:1px solid #222;border-radius:8px;padding:1rem;font-family:monospace;font-size:0.75rem;line-height:1.8">
+      <div style="color:#52b788">wifi-captive-portal/</div>
+      <div style="padding-left:1rem">
+        <div style="color:#74b9ff">├── app/</div>
+        <div style="padding-left:1rem;color:#aaa">
+          <div><span style="color:#f0a500">├── portal/</span>       <span style="color:#555"># guest-facing pages</span></div>
+          <div style="padding-left:1rem;color:#888">
+            <div>├── router.py</div>
+            <div>├── schemas.py</div>
+            <div>└── templates/</div>
+          </div>
+          <div><span style="color:#74b9ff">├── admin/</span>        <span style="color:#555"># dashboard</span></div>
+          <div style="padding-left:1rem;color:#888">
+            <div>├── router.py</div>
+            <div>├── schemas.py</div>
+            <div>└── templates/</div>
+          </div>
+          <div><span style="color:#c39bd3">├── network/</span>      <span style="color:#555"># iptables control</span></div>
+          <div style="padding-left:1rem;color:#888">
+            <div>├── iptables.py</div>
+            <div>├── session_manager.py</div>
+            <div>└── scheduler.py</div>
+          </div>
+          <div><span style="color:#f0a500">├── pms/</span>          <span style="color:#555"># PMS adapters</span></div>
+          <div style="padding-left:1rem;color:#888">
+            <div>├── base.py           <span style="color:#555"># abstract</span></div>
+            <div>├── opera.py</div>
+            <div>├── cloudbeds.py</div>
+            <div>├── mews.py</div>
+            <div>├── custom.py</div>
+            <div>├── standalone.py</div>
+            <div>└── factory.py</div>
+          </div>
+          <div><span style="color:#a8d5a2">├── voucher/</span>      <span style="color:#555"># voucher system</span></div>
+          <div style="padding-left:1rem;color:#888">
+            <div>├── router.py</div>
+            <div>└── generator.py</div>
+          </div>
+          <div><span style="color:#aaa">├── core/</span>         <span style="color:#555"># shared</span></div>
+          <div style="padding-left:1rem;color:#888">
+            <div>├── models.py         <span style="color:#555"># SQLAlchemy</span></div>
+            <div>├── database.py</div>
+            <div>├── auth.py           <span style="color:#555"># JWT admin</span></div>
+            <div>└── config.py</div>
+          </div>
+          <div>└── main.py</div>
+        </div>
+        <div style="color:#74b9ff">├── static/</div>
+        <div style="padding-left:1rem;color:#888">
+          <div>├── css/ js/ img/</div>
+        </div>
+        <div style="color:#74b9ff">├── tests/</div>
+        <div style="padding-left:1rem;color:#888">
+          <div>├── test_portal.py</div>
+          <div>├── test_pms/</div>
+          <div>└── test_network.py</div>
+        </div>
+        <div style="color:#aaa">├── alembic/          <span style="color:#555"># DB migrations</span></div>
+        <div style="color:#aaa">├── scripts/          <span style="color:#555"># iptables setup</span></div>
+        <div style="color:#aaa">├── docker-compose.yml</div>
+        <div style="color:#aaa">├── .env.example</div>
+        <div style="color:#aaa">└── requirements.txt</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tech Stack -->
+  <div style="display:flex;flex-direction:column;gap:0.75rem">
+    <h3 style="margin-bottom:0">Tech Stack</h3>
+
+    <div style="background:var(--surface);border:1px solid #2d6a4f;border-radius:8px;padding:0.85rem">
+      <div class="label" style="color:#52b788;margin-bottom:0.5rem">Backend</div>
+      <div style="font-size:0.8rem;display:grid;grid-template-columns:1fr 1fr;gap:0.3rem;color:var(--text-secondary)">
+        <div>FastAPI — web framework</div>
+        <div>SQLAlchemy — ORM</div>
+        <div>Alembic — migrations</div>
+        <div>APScheduler — background jobs</div>
+        <div>httpx — async HTTP (PMS calls)</div>
+        <div>python-jose — JWT auth</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid #2d4a6a;border-radius:8px;padding:0.85rem">
+      <div class="label" style="color:#74b9ff;margin-bottom:0.5rem">Frontend</div>
+      <div style="font-size:0.8rem;display:grid;grid-template-columns:1fr 1fr;gap:0.3rem;color:var(--text-secondary)">
+        <div>Jinja2 — portal templates</div>
+        <div>HTMX — dynamic updates</div>
+        <div>Alpine.js — lightweight reactivity</div>
+        <div>Tailwind CSS — styling</div>
+        <div>Chart.js — analytics charts</div>
+        <div>—</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid #7a5a2d;border-radius:8px;padding:0.85rem">
+      <div class="label" style="color:#f0a500;margin-bottom:0.5rem">Infrastructure</div>
+      <div style="font-size:0.8rem;display:grid;grid-template-columns:1fr 1fr;gap:0.3rem;color:var(--text-secondary)">
+        <div>PostgreSQL — database</div>
+        <div>Redis — session cache</div>
+        <div>dnsmasq — DHCP + DNS</div>
+        <div>iptables/nftables — network</div>
+        <div>Nginx — reverse proxy</div>
+        <div>Uvicorn — ASGI server</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid #555;border-radius:8px;padding:0.85rem">
+      <div class="label" style="margin-bottom:0.5rem">Testing</div>
+      <div style="font-size:0.8rem;color:var(--text-secondary)">
+        <div>pytest + pytest-asyncio — unit & integration</div>
+        <div>httpx TestClient — API testing</div>
+        <div>Mock PMS adapters — ไม่ต้องมี PMS จริงตอนทดสอบ</div>
+        <div>pytest-cov — coverage report</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid #2d6a4f;border-radius:8px;padding:0.85rem">
+      <div class="label" style="color:#52b788;margin-bottom:0.5rem">Deployment (Ubuntu)</div>
+      <div style="font-size:0.8rem;color:var(--text-secondary)">
+        <div>systemd service — auto-start FastAPI</div>
+        <div>docker-compose — PostgreSQL + Redis</div>
+        <div>iptables-persistent — rules survive reboot</div>
+        <div>logrotate — manage log files</div>
+      </div>
+    </div>
+
+  </div>
+</div>
