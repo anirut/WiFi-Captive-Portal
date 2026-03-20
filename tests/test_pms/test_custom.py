@@ -67,8 +67,7 @@ async def test_verify_guest_basic_auth():
         result = await adapter.verify_guest("101", "Smith")
     assert result is not None
 
-@pytest.mark.asyncio
-async def test_field_map_resolves_nested_path():
+def test_field_map_resolves_nested_path():
     adapter = CustomAdapter(CONFIG_BEARER)
     result = adapter._resolve("data.guest.surname", PMS_RESP)
     assert result == "Smith"

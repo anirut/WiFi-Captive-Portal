@@ -77,7 +77,10 @@ class MewsAdapter(PMSAdapter):
                 json={
                     **self._auth(),
                     "States": ["Processed"],
-                    "EndUtc": {"StartUtc": since.isoformat()},
+                    "EndUtc": {
+                        "StartUtc": since.isoformat().replace("+00:00", "Z"),
+                        "EndUtc": "2099-01-01T00:00:00Z",
+                    },
                     "Extent": {"Reservations": True, "Spaces": True},
                 },
                 timeout=10.0,

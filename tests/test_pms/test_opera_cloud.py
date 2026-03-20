@@ -23,15 +23,6 @@ RESERVATION_RESP = {
     }]
 }
 
-def _make_mock_client(post_json=None, get_json=None):
-    mock_resp = MagicMock()
-    mock_resp.raise_for_status = MagicMock()
-    mock_resp.json.side_effect = [post_json, get_json] if post_json else [get_json]
-    mock_client = AsyncMock()
-    mock_client.post = AsyncMock(return_value=mock_resp)
-    mock_client.get = AsyncMock(return_value=mock_resp)
-    return mock_client
-
 @pytest.mark.asyncio
 async def test_verify_guest_success():
     adapter = OperaCloudAdapter(CONFIG)
