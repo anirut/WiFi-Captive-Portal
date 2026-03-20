@@ -1,6 +1,6 @@
 import uuid
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Integer, Boolean, BigInteger, ForeignKey, Enum, DateTime, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID, INET, MACADDR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -39,7 +39,7 @@ class Guest(Base):
     check_in: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     check_out: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     max_devices: Mapped[int] = mapped_column(Integer, default=3)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     sessions: Mapped[list["Session"]] = relationship(back_populates="guest")
 
 class Session(Base):
@@ -49,7 +49,7 @@ class Session(Base):
     voucher_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("vouchers.id"), nullable=True)
     ip_address: Mapped[str] = mapped_column(INET)
     mac_address: Mapped[str | None] = mapped_column(MACADDR, nullable=True)
-    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     bytes_up: Mapped[int] = mapped_column(BigInteger, default=0)
     bytes_down: Mapped[int] = mapped_column(BigInteger, default=0)
