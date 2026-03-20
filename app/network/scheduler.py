@@ -19,4 +19,4 @@ def start_scheduler():
     logger.info("Session expiry scheduler started")
 
 def stop_scheduler():
-    scheduler.shutdown()
+    scheduler.shutdown(wait=False)
