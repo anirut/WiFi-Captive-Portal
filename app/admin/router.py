@@ -3,14 +3,15 @@ import uuid
 import bcrypt as _bcrypt
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType
 from app.core.encryption import encrypt_config, decrypt_config
-from app.core.auth import get_current_user, get_current_admin, create_access_token
+from app.core.auth import get_current_user, get_current_admin, create_access_token, decode_access_token
 from app.network.session_manager import SessionManager
 from app.pms.factory import load_adapter, ADAPTER_MAP
 from app.admin.schemas import PMSConfigResponse, PMSConfigUpdate, PMSTestResult, VoucherCreate, VoucherResponse
@@ -18,6 +19,7 @@ from app.voucher.generator import generate_code
 
 router = APIRouter(prefix="/admin")
 session_manager = SessionManager()
+_templates = Jinja2Templates(directory="app/admin/templates")
 
 def _verify_password(plain: str, hashed: str) -> bool:
     return _bcrypt.checkpw(plain.encode(), hashed.encode() if isinstance(hashed, str) else hashed)
@@ -31,6 +33,52 @@ class AdminLoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+@router.get("/login", response_class=HTMLResponse, include_in_schema=False)
+async def login_page(request: Request):
+    token = request.cookies.get("admin_token")
+    if token:
+        payload = decode_access_token(token)
+        if payload:
+            return RedirectResponse(url="/admin/", status_code=302)
+    return _templates.TemplateResponse("login.html", {"request": request, "error": None})
+
+
+@router.post("/login/form", response_class=HTMLResponse, include_in_schema=False)
+async def login_submit(request: Request, db: AsyncSession = Depends(get_db)):
+    form = await request.form()
+    username = form.get("username", "")
+    password = form.get("password", "")
+    result = await db.execute(select(AdminUser).where(AdminUser.username == username))
+    user = result.scalar_one_or_none()
+    if not user or not _verify_password(password, user.password_hash):
+        return _templates.TemplateResponse("login.html",
+            {"request": request, "error": "Invalid username or password"}, status_code=401)
+    user.last_login_at = datetime.now(timezone.utc)
+    await db.commit()
+    token = create_access_token({"sub": user.username, "role": user.role.value})
+    next_url = request.query_params.get("next", "/admin/")
+    resp = RedirectResponse(url=next_url, status_code=302)
+    resp.set_cookie("admin_token", token, httponly=True, samesite="lax")
+    return resp
+
+
+@router.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def dashboard_page(request: Request, payload: dict = Depends(get_current_admin),
+                         db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Session).where(Session.status == SessionStatus.active)
+        .order_by(Session.connected_at.desc()).limit(10)
+    )
+    recent_sessions = result.scalars().all()
+    active_count = len(recent_sessions)
+    flash = request.session.pop("flash", None)
+    return _templates.TemplateResponse("dashboard.html", {
+        "request": request, "current_user": payload,
+        "recent_sessions": recent_sessions, "active_count": active_count,
+        "flash": flash,
+    })
 
 
 @router.post("/login", response_model=TokenResponse)

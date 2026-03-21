@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Admin{% endblock %} — Hotel WiFi Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #0f172a; color: #e2e8f0; }
+    .glass { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(12px); }
+    .gradient-accent { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 min-h-screen glass flex flex-col p-4 fixed top-0 left-0">
+    <div class="mb-8">
+      <h1 class="text-xl font-bold gradient-accent bg-clip-text text-transparent">Hotel WiFi</h1>
+      <p class="text-xs text-slate-400">Admin Panel</p>
+    </div>
+    <nav class="flex-1 space-y-1">
+      <a href="/admin/" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Dashboard</a>
+      <a href="/admin/sessions" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Sessions</a>
+      <a href="/admin/vouchers" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Vouchers</a>
+      {% if current_user.role == 'superadmin' %}
+      <a href="/admin/policies" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Rooms &amp; Policies</a>
+      <a href="/admin/analytics" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Analytics</a>
+      <a href="/admin/pms" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">PMS Settings</a>
+      <a href="/admin/brand" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Brand &amp; Config</a>
+      <a href="/admin/users" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Admin Users</a>
+      {% endif %}
+    </nav>
+    <div class="mt-auto pt-4 border-t border-white/10">
+      <p class="text-xs text-slate-400 mb-2">{{ current_user.sub }} <span class="text-indigo-400">({{ current_user.role }})</span></p>
+      <form action="/admin/logout" method="post">
+        <button class="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg">Logout</button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="ml-64 flex-1 p-8">
+    {% if flash %}
+    <div class="mb-4 px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-sm">
+      {{ flash }}
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>
