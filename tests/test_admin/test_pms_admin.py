@@ -79,3 +79,16 @@ async def test_post_pms_test_returns_ok_false_on_error(admin_client):
         })
     assert resp.status_code == 200
     assert resp.json()["ok"] is False
+
+@pytest.mark.asyncio
+async def test_post_pms_test_returns_ok_false_on_exception(admin_client):
+    client, _ = admin_client
+    with patch("app.pms.cloudbeds.CloudbedsAdapter.health_check", new_callable=AsyncMock, side_effect=Exception("connection refused")):
+        resp = await client.post("/admin/pms/test", json={
+            "type": "cloudbeds",
+            "config": {"api_url": "https://api.cloudbeds.com", "api_key": "bad", "property_id": "P1"},
+        })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is False
+    assert "connection refused" in data["error"]

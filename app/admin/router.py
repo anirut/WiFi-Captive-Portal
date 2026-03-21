@@ -26,7 +26,7 @@ async def kick_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)
     result = await db.execute(select(Session).where(Session.id == session_id))
     session = result.scalar_one_or_none()
     if not session:
-        raise HTTPException(status_code=404, detail="not_found")
+        raise HTTPException(status_code=404, detail={"error": "not_found"})
     await session_manager.expire_session(db, session, SessionStatus.kicked)
     return {"status": "kicked"}
 
@@ -76,7 +76,9 @@ async def update_pms_config(body: PMSConfigUpdate, db: AsyncSession = Depends(ge
 @router.post("/pms/test", response_model=PMSTestResult)
 async def test_pms_config(body: PMSConfigUpdate):
     adapter_class = ADAPTER_MAP.get(body.type)
-    if not adapter_class or body.type == PMSAdapterType.standalone:
+    if not adapter_class:
+        return PMSTestResult(ok=False, latency_ms=0.0, error="unsupported_adapter_type")
+    if body.type == PMSAdapterType.standalone:
         return PMSTestResult(ok=True, latency_ms=0.0)
     adapter = adapter_class(body.config)
     start = time.monotonic()

@@ -19,5 +19,5 @@ class PMSConfigUpdate(BaseModel):
 
 class PMSTestResult(BaseModel):
     ok: bool
-    latency_ms: float | None = None
+    latency_ms: float = 0.0
     error: str | None = None
