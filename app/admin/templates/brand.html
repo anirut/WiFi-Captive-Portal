@@ -53,9 +53,9 @@
       <button @click="tab='en'" :class="tab=='en' ? 'text-white' : 'glass text-slate-300'" class="px-4 py-1 rounded text-sm" :style="tab=='en' ? 'background:linear-gradient(135deg,#6366f1,#8b5cf6)' : ''">English</button>
     </div>
     <form hx-put="/admin/api/brand" hx-target="#tc-result" class="space-y-3">
-      <textarea x-show="tab=='th'" name="tc_text_th" rows="8"
+      <textarea x-show="tab=='th'" :disabled="tab !== 'th'" name="tc_text_th" rows="8"
                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm">{{ brand.tc_text_th if brand and brand.tc_text_th else '' }}</textarea>
-      <textarea x-show="tab=='en'" name="tc_text_en" rows="8"
+      <textarea x-show="tab=='en'" :disabled="tab !== 'en'" name="tc_text_en" rows="8"
                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm">{{ brand.tc_text_en if brand and brand.tc_text_en else '' }}</textarea>
       <button type="submit" class="py-2 px-6 rounded text-white font-medium" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Save T&amp;C</button>
     </form>

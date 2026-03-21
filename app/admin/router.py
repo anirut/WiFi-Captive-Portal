@@ -529,6 +529,7 @@ async def analytics_page(
 # ── Brand & Config ────────────────────────────────────────────────────────────
 
 ALLOWED_LOGO_MIME = {"image/jpeg", "image/png", "image/webp"}
+MIME_TO_EXT = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB
 LOGO_UPLOAD_DIR = "static/uploads/logo"
 
@@ -562,7 +563,10 @@ async def update_brand(body: BrandUpdate, db: AsyncSession = Depends(get_db),
         raise HTTPException(404, {"error": "brand_config_not_seeded"})
     for field, value in body.dict(exclude_none=True).items():
         if field == "language":
-            value = LanguageType(value)
+            try:
+                value = LanguageType(value)
+            except ValueError:
+                raise HTTPException(422, {"error": "invalid_language", "allowed": ["th", "en"]})
         setattr(b, field, value)
     b.updated_at = datetime.now(timezone.utc)
     await db.commit()
@@ -577,7 +581,7 @@ async def upload_logo(file: UploadFile = File(...), db: AsyncSession = Depends(g
     data = await file.read(MAX_LOGO_BYTES + 1)
     if len(data) > MAX_LOGO_BYTES:
         raise HTTPException(413, {"error": "file_too_large", "max_mb": 2})
-    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "jpg"
+    ext = MIME_TO_EXT[file.content_type]
     _os.makedirs(LOGO_UPLOAD_DIR, exist_ok=True)
     for ext_check in ("jpg", "jpeg", "png", "webp"):
         old = f"{LOGO_UPLOAD_DIR}/logo.{ext_check}"
