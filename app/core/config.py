@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     PORTAL_IP: str = "192.168.1.1"
     PORTAL_PORT: int = 8080
 
+    # DNS upstream for authenticated guests
+    DNS_UPSTREAM_IP: str = "8.8.8.8"
+
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 8
 
