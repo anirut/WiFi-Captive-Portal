@@ -10,11 +10,16 @@ from app.portal.router import router as portal_router
 from app.admin.router import router as admin_router
 from app.pms.webhook_router import router as webhook_router
 from app.network.scheduler import start_scheduler, stop_scheduler
+from app.network.tc import ensure_ifb_ready
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     app.state.redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    try:
+        ensure_ifb_ready()
+    except Exception:
+        pass
     start_scheduler()
     yield
     # Shutdown
