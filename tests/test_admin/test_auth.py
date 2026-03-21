@@ -19,6 +19,7 @@ def _make_app_with_db(mock_db):
 
         app.dependency_overrides[get_db] = override
         app.state.redis = AsyncMock()
+        app.state.redis.exists = AsyncMock(return_value=False)
         return app
 
 

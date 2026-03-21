@@ -39,6 +39,7 @@ async def client():
         app.state.redis = AsyncMock()
         app.state.redis.incr = AsyncMock(return_value=1)
         app.state.redis.expire = AsyncMock()
+        app.state.redis.exists = AsyncMock(return_value=False)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             yield c
         app.dependency_overrides.clear()

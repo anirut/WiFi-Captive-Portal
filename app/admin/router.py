@@ -1,15 +1,17 @@
 import time
+import time as _time
 import uuid
 import bcrypt as _bcrypt
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType
 from app.core.encryption import encrypt_config, decrypt_config
-from app.core.auth import get_current_user, create_access_token
+from app.core.auth import get_current_user, get_current_admin, create_access_token
 from app.network.session_manager import SessionManager
 from app.pms.factory import load_adapter, ADAPTER_MAP
 from app.admin.schemas import PMSConfigResponse, PMSConfigUpdate, PMSTestResult, VoucherCreate, VoucherResponse
@@ -43,10 +45,21 @@ async def admin_login(body: AdminLoginRequest, db: AsyncSession = Depends(get_db
     token = create_access_token({"sub": user.username, "role": user.role.value})
     return TokenResponse(access_token=token)
 
+@router.post("/logout")
+async def admin_logout(request: Request, payload: dict = Depends(get_current_admin)):
+    jti = payload["jti"]
+    exp = payload["exp"]
+    remaining_ttl = max(1, int(exp - _time.time()))
+    await request.app.state.redis.set(f"blocklist:{jti}", 1, ex=remaining_ttl)
+    response = JSONResponse({"status": "logged_out"})
+    response.delete_cookie("admin_token")
+    return response
+
+
 @router.get("/sessions")
 async def list_sessions(
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(get_current_admin),
 ):
     result = await db.execute(
         select(Session).where(Session.status == SessionStatus.active)
@@ -58,7 +71,7 @@ async def list_sessions(
 async def kick_session(
     session_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(get_current_admin),
 ):
     result = await db.execute(select(Session).where(Session.id == session_id))
     session = result.scalar_one_or_none()
@@ -79,7 +92,7 @@ def _mask_config(config: dict) -> dict:
 @router.get("/pms", response_model=PMSConfigResponse)
 async def get_pms_config(
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(get_current_admin),
 ):
     result = await db.execute(
         select(PMSAdapterModel).where(PMSAdapterModel.is_active == True)
@@ -101,7 +114,7 @@ async def get_pms_config(
 async def update_pms_config(
     body: PMSConfigUpdate,
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(get_current_admin),
 ):
     result = await db.execute(
         select(PMSAdapterModel).where(PMSAdapterModel.is_active == True)
@@ -122,7 +135,7 @@ async def update_pms_config(
 @router.post("/pms/test", response_model=PMSTestResult)
 async def test_pms_config(
     body: PMSConfigUpdate,
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(get_current_admin),
 ):
     adapter_class = ADAPTER_MAP.get(body.type)
     if not adapter_class:
@@ -144,7 +157,7 @@ async def test_pms_config(
 async def create_voucher(
     body: VoucherCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin),
 ):
     # Resolve admin user id from JWT sub (username)
     result = await db.execute(select(AdminUser).where(AdminUser.username == current_user["sub"]))
@@ -187,7 +200,7 @@ async def create_voucher(
 @router.get("/vouchers", response_model=list[VoucherResponse])
 async def list_vouchers(
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(get_current_admin),
 ):
     result = await db.execute(select(Voucher))
     vouchers = result.scalars().all()
@@ -212,7 +225,7 @@ async def list_vouchers(
 async def delete_voucher(
     voucher_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_user),
+    _: dict = Depends(get_current_admin),
 ):
     result = await db.execute(select(Voucher).where(Voucher.id == voucher_id))
     voucher = result.scalar_one_or_none()

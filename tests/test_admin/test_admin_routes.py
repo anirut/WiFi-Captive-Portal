@@ -31,6 +31,7 @@ async def admin_client():
         app.state.redis = AsyncMock()
         app.state.redis.incr = AsyncMock(return_value=1)
         app.state.redis.expire = AsyncMock()
+        app.state.redis.exists = AsyncMock(return_value=False)
 
         token = create_access_token({"sub": "admin", "role": "superadmin"})
         async with AsyncClient(
