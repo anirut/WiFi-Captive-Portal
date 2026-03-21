@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.models import Session, SessionStatus, Guest
-from app.network.iptables import add_whitelist, remove_whitelist, add_dns_bypass, remove_dns_bypass
+from app.network.nftables import NftablesManager as nft
 from app.network.tc import apply_bandwidth_limit, remove_bandwidth_limit
 from app.network.arp import get_mac_for_ip
 from app.core.config import settings
@@ -37,15 +37,13 @@ class SessionManager:
         db.add(session)
         await db.commit()
         await db.refresh(session)
-        add_whitelist(ip)
-        add_dns_bypass(ip)
+        nft.create_session_rules(ip)
         apply_bandwidth_limit(ip, bandwidth_up_kbps, bandwidth_down_kbps, self.wan_if)
         logger.info(f"Session created: {session.id} for {ip}")
         return session
 
     async def expire_session(self, db: AsyncSession, session: Session, status: SessionStatus = SessionStatus.expired) -> None:
-        remove_whitelist(session.ip_address)
-        remove_dns_bypass(session.ip_address)
+        nft.remove_session_rules(session.ip_address)
         remove_bandwidth_limit(session.ip_address, session.bandwidth_up_kbps, self.wan_if)
         session.status = status
         await db.commit()
