@@ -10,9 +10,9 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
-from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType
+from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType, Policy, Room
 from app.core.encryption import encrypt_config, decrypt_config
-from app.core.auth import get_current_user, get_current_admin, create_access_token, decode_access_token
+from app.core.auth import get_current_user, get_current_admin, create_access_token, decode_access_token, require_superadmin
 from app.core.config import settings
 from app.network.session_manager import SessionManager
 from app.pms.factory import load_adapter, ADAPTER_MAP
@@ -359,3 +359,109 @@ async def delete_voucher(
         raise HTTPException(status_code=404, detail={"error": "not_found"})
     await db.delete(voucher)
     await db.commit()
+
+
+# ── Policy CRUD ──────────────────────────────────────────────────────────────
+
+class PolicyCreate(BaseModel):
+    name: str
+    bandwidth_up_kbps: int = 0
+    bandwidth_down_kbps: int = 0
+    session_duration_min: int = 0
+    max_devices: int = 3
+
+
+@router.get("/api/policies")
+async def list_policies(db: AsyncSession = Depends(get_db),
+                        _: dict = Depends(require_superadmin)):
+    result = await db.execute(select(Policy))
+    return [{"id": str(p.id), "name": p.name, "bandwidth_up_kbps": p.bandwidth_up_kbps,
+             "bandwidth_down_kbps": p.bandwidth_down_kbps, "session_duration_min": p.session_duration_min,
+             "max_devices": p.max_devices} for p in result.scalars().all()]
+
+
+@router.post("/api/policies", status_code=201)
+async def create_policy(body: PolicyCreate, db: AsyncSession = Depends(get_db),
+                         _: dict = Depends(require_superadmin)):
+    p = Policy(**body.dict())
+    db.add(p)
+    await db.commit()
+    await db.refresh(p)
+    return {"id": str(p.id), "name": p.name}
+
+
+@router.put("/api/policies/{policy_id}")
+async def update_policy(policy_id: uuid.UUID, body: PolicyCreate,
+                         db: AsyncSession = Depends(get_db), _: dict = Depends(require_superadmin)):
+    result = await db.execute(select(Policy).where(Policy.id == policy_id))
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, {"error": "not_found"})
+    for k, v in body.dict().items():
+        setattr(p, k, v)
+    await db.commit()
+    return {"id": str(p.id), "name": p.name}
+
+
+@router.delete("/api/policies/{policy_id}")
+async def delete_policy(policy_id: uuid.UUID, db: AsyncSession = Depends(get_db),
+                         _: dict = Depends(require_superadmin)):
+    result = await db.execute(select(Policy).where(Policy.id == policy_id))
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, {"error": "not_found"})
+    await db.delete(p)
+    await db.commit()
+    return {"status": "deleted"}
+
+
+# ── Rooms ─────────────────────────────────────────────────────────────────────
+
+class RoomPolicyAssign(BaseModel):
+    policy_id: uuid.UUID | None = None
+
+
+@router.get("/api/rooms")
+async def list_rooms(db: AsyncSession = Depends(get_db), _: dict = Depends(require_superadmin)):
+    result = await db.execute(select(Room))
+    return [{"id": str(r.id), "number": r.number, "room_type": r.room_type,
+             "policy_id": str(r.policy_id) if r.policy_id else None} for r in result.scalars().all()]
+
+
+@router.put("/api/rooms/{room_id}/policy")
+async def assign_room_policy(room_id: uuid.UUID, body: RoomPolicyAssign,
+                              db: AsyncSession = Depends(get_db), _: dict = Depends(require_superadmin)):
+    result = await db.execute(select(Room).where(Room.id == room_id))
+    r = result.scalar_one_or_none()
+    if not r:
+        raise HTTPException(404, {"error": "not_found"})
+    r.policy_id = body.policy_id
+    await db.commit()
+    return {"id": str(r.id), "number": r.number, "policy_id": str(r.policy_id) if r.policy_id else None}
+
+
+# ── HTML pages ────────────────────────────────────────────────────────────────
+
+@router.get("/policies", response_class=HTMLResponse, include_in_schema=False)
+async def policies_page(request: Request, payload: dict = Depends(require_superadmin),
+                         db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Policy))
+    policies = result.scalars().all()
+    flash = request.session.pop("flash", None)
+    return _templates.TemplateResponse("policies.html", {
+        "request": request, "current_user": payload, "policies": policies, "flash": flash,
+    })
+
+
+@router.get("/rooms", response_class=HTMLResponse, include_in_schema=False)
+async def rooms_page(request: Request, payload: dict = Depends(require_superadmin),
+                      db: AsyncSession = Depends(get_db)):
+    result_rooms = await db.execute(select(Room))
+    result_policies = await db.execute(select(Policy))
+    rooms = result_rooms.scalars().all()
+    policies = result_policies.scalars().all()
+    flash = request.session.pop("flash", None)
+    return _templates.TemplateResponse("rooms.html", {
+        "request": request, "current_user": payload,
+        "rooms": rooms, "policies": policies, "flash": flash,
+    })

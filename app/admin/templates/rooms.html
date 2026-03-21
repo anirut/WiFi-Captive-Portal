@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Rooms{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-semibold text-white mb-6">Rooms</h2>
+<div class="glass rounded-xl p-6">
+  <table class="w-full text-sm text-slate-300">
+    <thead><tr class="text-slate-500 border-b border-white/10">
+      <th class="pb-2 text-left">Room</th>
+      <th class="pb-2 text-left">Type</th>
+      <th class="pb-2 text-left">Policy</th>
+      <th class="pb-2 text-left"></th>
+    </tr></thead>
+    <tbody>
+    {% for r in rooms %}
+    <tr class="border-b border-white/5" id="room-{{ r.id }}">
+      <td class="py-2">{{ r.number }}</td>
+      <td class="py-2">{{ r.room_type or '-' }}</td>
+      <td class="py-2">
+        <select hx-put="/admin/api/rooms/{{ r.id }}/policy"
+                hx-target="#room-{{ r.id }}"
+                hx-include="this"
+                name="policy_id"
+                class="bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm">
+          <option value="">None</option>
+          {% for p in policies %}
+          <option value="{{ p.id }}" {% if r.policy_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="py-4 text-center text-slate-500">No rooms</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
