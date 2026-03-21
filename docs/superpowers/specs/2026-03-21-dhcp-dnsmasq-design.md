@@ -27,7 +27,8 @@ The portal currently assumes DHCP and DNS are managed externally. This spec inte
       ▼
 [dnsmasq]
       ├── dns_mode=redirect → answer all domains with portal IP (pre-auth captive detection)
-      └── dns_mode=forward  → forward to upstream DNS (8.8.8.8, 8.8.4.4)
+      │   authenticated guests: iptables DNAT redirects their port-53 to upstream DNS directly
+      └── dns_mode=forward  → forward to upstream DNS (8.8.8.8, 8.8.4.4) for all guests
 
 [Admin UI] → PUT /admin/api/dhcp → write /etc/dnsmasq.d/captive-portal.conf → systemctl reload dnsmasq
 ```
@@ -42,28 +43,30 @@ The FastAPI app runs as root (per existing install.sh), so it can write to `/etc
 
 Single-row configuration table (seeded with defaults on migration, same pattern as `brand_config`).
 
+Seed row UUID: `DHCP_CONFIG_ID = '00000000-0000-0000-0000-000000000002'`
+
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
-| `id` | UUID PK | generated | |
+| `id` | UUID PK | DHCP_CONFIG_ID | |
 | `enabled` | Boolean | true | Enable/disable dnsmasq management |
 | `interface` | String(32) | wlan0 | WiFi interface to bind |
 | `gateway_ip` | String(15) | 192.168.0.1 | Gateway IP (this server on WiFi side) |
 | `subnet` | String(18) | 192.168.0.0/22 | Subnet in CIDR notation |
 | `dhcp_range_start` | String(15) | 192.168.0.10 | First IP to assign |
 | `dhcp_range_end` | String(15) | 192.168.3.250 | Last IP to assign |
-| `lease_time` | String(8) | 8h | Lease duration (e.g. "1h", "8h", "24h") |
+| `lease_time` | String(8) | 8h | Lease duration: "30m", "1h", "4h", "8h", "12h", "24h" |
 | `dns_upstream_1` | String(45) | 8.8.8.8 | Primary upstream DNS |
 | `dns_upstream_2` | String(45) | 8.8.4.4 | Secondary upstream DNS |
 | `dns_mode` | Enum(DnsModeType) | redirect | `redirect` or `forward` |
-| `log_queries` | Boolean | false | Enable dnsmasq query logging |
+| `log_queries` | Boolean | false | Enable dnsmasq query + DHCP logging |
 | `updated_at` | DateTime(tz) | now | Last saved |
 
 ### `DnsModeType` enum
 
 ```python
 class DnsModeType(str, enum.Enum):
-    redirect = "redirect"   # answer all DNS with portal IP (pre-auth)
-    forward  = "forward"    # forward to upstream DNS directly
+    redirect = "redirect"   # answer all DNS with portal IP (pre-auth); bypassed for authed guests via iptables
+    forward  = "forward"    # forward to upstream DNS directly for all guests
 ```
 
 ### ORM model location
@@ -79,8 +82,11 @@ Add `DhcpConfig` and `DnsModeType` to `app/core/models.py`.
 | `alembic/versions/c3d4e5f6_dhcp_config.py` | New | Create `dhcp_config` table + seed default row |
 | `app/core/models.py` | Modify | Add `DnsModeType` enum + `DhcpConfig` ORM model |
 | `app/network/dnsmasq.py` | New | Config generation, file writing, reload, status, lease parsing |
+| `app/network/iptables.py` | Modify | Add `add_dns_bypass(ip)` + `remove_dns_bypass(ip)` |
+| `app/network/session_manager.py` | Modify | Call `add_dns_bypass(ip)` in `create_session()`, `remove_dns_bypass(ip)` in `expire_session()` |
 | `app/admin/router.py` | Modify | DHCP API + HTML page routes |
-| `app/admin/schemas.py` | Modify | `DhcpConfigUpdate` Pydantic schema |
+| `app/admin/schemas.py` | Modify | `DhcpConfigUpdate` + `DhcpConfigResponse` Pydantic schemas |
+| `app/admin/templates/base.html` | Modify | Add DHCP nav link to sidebar |
 | `app/admin/templates/dhcp.html` | New | Admin DHCP configuration UI |
 | `scripts/setup-dnsmasq.sh` | New | Install dnsmasq, disable default config, initial setup |
 | `tests/test_network/test_dnsmasq.py` | New | Unit tests for dnsmasq module |
@@ -94,7 +100,14 @@ Add `DhcpConfig` and `DnsModeType` to `app/core/models.py`.
 
 Generates `/etc/dnsmasq.d/captive-portal.conf` from the DB config object.
 
-Template output (dns_mode=redirect example):
+**CIDR to netmask conversion:** Use Python stdlib:
+```python
+import ipaddress
+netmask = str(ipaddress.IPv4Network(config.subnet, strict=False).netmask)
+# e.g. "192.168.0.0/22" → "255.255.252.0"
+```
+
+Template output (dns_mode=redirect, log_queries=True example):
 ```
 # Managed by WiFi Captive Portal — do not edit manually
 interface=wlan0
@@ -111,35 +124,38 @@ dhcp-option=option:dns-server,192.168.0.1
 server=8.8.8.8
 server=8.8.4.4
 
-# DNS mode: redirect (catch-all to portal)
+# DNS mode: redirect (catch-all to portal IP)
 address=/#/192.168.0.1
 
-# Logging
+# Logging (log_queries=True writes both directives)
 log-dhcp
+log-queries
 ```
 
-Template output (dns_mode=forward):
-```
-# Same as above but WITHOUT address=/#/... line
-# DNS queries forwarded normally to upstream
-```
+Template output (dns_mode=forward): identical but WITHOUT the `address=/#/...` line.
 
-When `enabled=False`, writes an empty/comment-only config and reloads (dnsmasq falls back to defaults or stops if no valid config).
+**When `enabled=False`:**
+- Do NOT write a config file
+- Run `systemctl stop dnsmasq` (subprocess, check=False, log errors)
+- `get_status()` will return `running: false`
 
 ### `reload_dnsmasq() -> bool`
 
 Runs `systemctl reload dnsmasq`. Returns True on success, False on failure. Logs errors.
+Only called when `enabled=True`.
 
 ### `get_status() -> dict`
 
 Returns:
 ```python
 {
-    "running": bool,        # systemctl is-active dnsmasq
-    "lease_count": int,     # count of lines in /var/lib/misc/dnsmasq.leases
-    "config_file_exists": bool,
+    "running": bool,             # systemctl is-active dnsmasq (exit code 0 = True)
+    "lease_count": int,          # count of lines in /var/lib/misc/dnsmasq.leases (0 if missing)
+    "config_file_exists": bool,  # os.path.exists("/etc/dnsmasq.d/captive-portal.conf")
 }
 ```
+
+All subprocess errors are caught and return `running: False`.
 
 ### `get_leases() -> list[dict]`
 
@@ -153,13 +169,86 @@ Returns:
         "mac": "aa:bb:cc:dd:ee:ff",
         "ip": "192.168.0.42",
         "hostname": "iPhone-guest",
-        "expires_at": "2026-03-21T18:00:00+00:00",  # ISO format
+        "expires_at": "2026-03-21T18:00:00+00:00",  # ISO format, UTC
     },
     ...
 ]
 ```
 
-Returns `[]` if file does not exist.
+Returns `[]` if file does not exist or cannot be read.
+
+---
+
+## Module: `app/network/iptables.py` additions
+
+Required for `dns_mode=redirect` to work correctly after authentication.
+
+### `add_dns_bypass(ip: str) -> None`
+
+Adds an iptables DNAT rule in the `nat` `PREROUTING` chain that redirects port-53 traffic from an authenticated guest IP directly to upstream DNS (`8.8.8.8`), bypassing dnsmasq's catch-all redirect:
+
+```bash
+iptables -t nat -I PREROUTING -s <ip> -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+iptables -t nat -I PREROUTING -s <ip> -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+```
+
+Uses existing `_run()` helper (same pattern as `add_whitelist`). Called from `SessionManager.create_session()`.
+
+### `remove_dns_bypass(ip: str) -> None`
+
+Removes the DNAT rules added by `add_dns_bypass`:
+
+```bash
+iptables -t nat -D PREROUTING -s <ip> -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+iptables -t nat -D PREROUTING -s <ip> -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+```
+
+Uses `_run()` with `check=False` (same pattern as `remove_whitelist`). Called from `SessionManager.expire_session()`.
+
+**Note:** `add_dns_bypass` / `remove_dns_bypass` are always called unconditionally in `SessionManager` (regardless of current `dns_mode`). When `dns_mode=forward`, these rules are harmless no-ops because dnsmasq does not have a catch-all redirect in that mode. This avoids coupling `SessionManager` to the DHCP config.
+
+---
+
+## Schemas: `app/admin/schemas.py`
+
+### `DhcpConfigUpdate`
+
+```python
+class DhcpConfigUpdate(BaseModel):
+    enabled: bool | None = None
+    interface: str | None = None
+    gateway_ip: str | None = None
+    subnet: str | None = None
+    dhcp_range_start: str | None = None
+    dhcp_range_end: str | None = None
+    lease_time: Literal["30m", "1h", "4h", "8h", "12h", "24h"] | None = None
+    dns_upstream_1: str | None = None
+    dns_upstream_2: str | None = None
+    dns_mode: str | None = None  # "redirect" | "forward"
+    log_queries: bool | None = None
+```
+
+### `DhcpConfigResponse`
+
+```python
+class DhcpConfigResponse(BaseModel):
+    id: str
+    enabled: bool
+    interface: str
+    gateway_ip: str
+    subnet: str
+    dhcp_range_start: str
+    dhcp_range_end: str
+    lease_time: str
+    dns_upstream_1: str
+    dns_upstream_2: str
+    dns_mode: str
+    log_queries: bool
+    updated_at: str  # ISO format
+```
+
+`GET /admin/api/dhcp` uses `DhcpConfigResponse`.
+`PUT /admin/api/dhcp` returns `DhcpConfigResponse` + `reloaded: bool`.
 
 ---
 
@@ -169,16 +258,12 @@ All endpoints require `require_superadmin` dependency.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/admin/api/dhcp` | Return current `DhcpConfig` as JSON |
-| `PUT` | `/admin/api/dhcp` | Update config → write file → reload dnsmasq |
+| `GET` | `/admin/api/dhcp` | Return current `DhcpConfig` as `DhcpConfigResponse` |
+| `PUT` | `/admin/api/dhcp` | Update config → write file → reload dnsmasq → return updated config + `reloaded` |
 | `GET` | `/admin/api/dhcp/status` | Return `get_status()` dict |
 | `GET` | `/admin/api/dhcp/leases` | Return `get_leases()` list |
-| `POST` | `/admin/api/dhcp/reload` | Manually trigger `reload_dnsmasq()` |
+| `POST` | `/admin/api/dhcp/reload` | Manually trigger `reload_dnsmasq()` → return `{"reloaded": bool}` |
 | `GET` | `/admin/dhcp` | HTML page rendering `dhcp.html` |
-
-### PUT /admin/api/dhcp response
-
-On success, returns updated config fields + `{"reloaded": true/false}` indicating whether dnsmasq reload succeeded.
 
 ---
 
@@ -198,14 +283,14 @@ Extends `base.html`. Glassmorphism style (matching existing templates). Three ca
 - Gateway IP (text input)
 - Subnet (text input, CIDR)
 - DHCP Range Start / End (text inputs)
-- Lease Time (select: 30m / 1h / 4h / 8h / 12h / 24h / custom text)
+- Lease Time (select: 30m / 1h / 4h / 8h / 12h / 24h)
 - DNS Upstream 1 + 2 (text inputs)
 - DNS Mode (radio buttons: `redirect` / `forward`, with tooltip explaining each)
-- Log DNS Queries (checkbox)
+- Log Queries (checkbox — enables both `log-dhcp` and `log-queries` in dnsmasq)
 - Save button → `hx-put="/admin/api/dhcp"` with inline success/error feedback
 
 ### Card 3 — Active DHCP Leases
-- Search box (Alpine.js client-side filter)
+- Search box (Alpine.js client-side filter on MAC/IP/hostname)
 - Table: MAC Address | IP Address | Hostname | Expires At
 - HTMX poll every 30s: `hx-get="/admin/api/dhcp/leases"` on tbody
 
@@ -213,16 +298,46 @@ Extends `base.html`. Glassmorphism style (matching existing templates). Three ca
 
 ## Script: `scripts/setup-dnsmasq.sh`
 
-One-time setup script (called during `install.sh`):
+One-time setup script (called during `install.sh` Section 8):
 
-1. `apt-get install -y dnsmasq`
-2. `systemctl stop dnsmasq` (before we take over config)
-3. Disable default config: `echo "conf-dir=/etc/dnsmasq.d/,*.conf" > /etc/dnsmasq.conf`
-4. Create `/etc/dnsmasq.d/` directory if needed
-5. `systemctl enable dnsmasq`
-6. `systemctl start dnsmasq`
+```bash
+#!/usr/bin/env bash
+set -e
+apt-get install -y dnsmasq
+systemctl stop dnsmasq || true
+# Replace default config to only load our drop-in
+echo "conf-dir=/etc/dnsmasq.d/,*.conf" > /etc/dnsmasq.conf
+mkdir -p /etc/dnsmasq.d
+systemctl enable dnsmasq
+# Don't start here — write_config() + reload_dnsmasq() called from app lifespan
+```
 
-`install.sh` will be updated to call this script in Section 8 (after iptables/tc).
+`install.sh` is updated to call `bash "$SCRIPT_DIR/setup-dnsmasq.sh"` in Section 8 (Network Rules), after iptables/tc setup.
+
+---
+
+## app/main.py lifespan integration
+
+In the existing `lifespan` async context manager, add dnsmasq startup restoration after the IFB/tc setup:
+
+```python
+# In lifespan startup block:
+from app.core.database import AsyncSessionFactory
+from app.core.models import DhcpConfig
+from app.network import dnsmasq as _dnsmasq
+from sqlalchemy import select
+
+try:
+    async with AsyncSessionFactory() as _db:
+        _result = await _db.execute(select(DhcpConfig))
+        _dhcp = _result.scalar_one_or_none()
+        if _dhcp and _dhcp.enabled:
+            _dnsmasq.write_config(_dhcp)
+            _dnsmasq.reload_dnsmasq()
+            logger.info("dnsmasq config restored from DB")
+except Exception as e:
+    logger.warning(f"dnsmasq startup restore failed: {e}")
+```
 
 ---
 
@@ -230,16 +345,17 @@ One-time setup script (called during `install.sh`):
 
 ### `tests/test_network/test_dnsmasq.py`
 
-- `test_write_config_redirect_mode` — call `write_config()` with mock config, assert file content contains `address=/#/`
-- `test_write_config_forward_mode` — assert file content does NOT contain `address=/#/`
-- `test_get_leases_parses_correctly` — mock lease file content, assert parsed dicts match expected
+- `test_write_config_redirect_mode` — call `write_config()` with mock config (redirect mode), mock `open()`, assert written content contains `address=/#/` and correct CIDR-derived netmask
+- `test_write_config_forward_mode` — assert written content does NOT contain `address=/#/`
+- `test_write_config_disabled_mode` — when `enabled=False`, assert `systemctl stop dnsmasq` is called (mock subprocess), no file written
+- `test_get_leases_parses_correctly` — mock lease file with sample line, assert parsed dict has correct mac/ip/hostname/expires_at
 - `test_get_leases_returns_empty_when_no_file` — assert returns `[]` when file missing
-- `test_get_status_returns_dict` — mock subprocess, assert keys present
+- `test_get_status_returns_dict` — mock subprocess, assert all three keys present (`running`, `lease_count`, `config_file_exists`)
 
 ### `tests/test_admin/test_admin_dhcp.py`
 
-- `test_get_dhcp_config_returns_defaults` — GET /admin/api/dhcp → 200, has all expected keys
-- `test_update_dhcp_config` — PUT with new lease_time → config updated (mock DB)
+- `test_get_dhcp_config_returns_defaults` — GET /admin/api/dhcp with superadmin token → 200, response has all `DhcpConfigResponse` fields
+- `test_update_dhcp_config` — PUT /admin/api/dhcp with `lease_time="1h"` → mock DB returns updated record (404 with mock DB is acceptable, assert not 500)
 - `test_staff_cannot_access_dhcp` — GET /admin/api/dhcp with staff token → 403
 - `test_dhcp_leases_endpoint` — GET /admin/api/dhcp/leases → 200, returns list
 - `test_dhcp_status_endpoint` — GET /admin/api/dhcp/status → 200, has `running` key
@@ -248,10 +364,11 @@ One-time setup script (called during `install.sh`):
 
 ## Integration with Existing System
 
-- **install.sh**: Add call to `scripts/setup-dnsmasq.sh` in Section 8 (Network Rules)
-- **app/main.py**: On lifespan startup, read `DhcpConfig` from DB — if `enabled=True` and config exists, call `write_config()` + `reload_dnsmasq()` to restore config after server restart
-- **iptables**: No changes needed. Existing rules already allow DNS passthrough (`FORWARD` on port 53). dnsmasq listens on the gateway IP itself (INPUT chain), not via FORWARD.
-- **`app/network/arp.py`**: No changes. MAC lookup still works the same way.
+- **install.sh**: Add call to `scripts/setup-dnsmasq.sh` in Section 8
+- **app/main.py**: Restore dnsmasq config from DB on lifespan startup (see above)
+- **iptables**: `add_whitelist`/`remove_whitelist` unchanged. New `add_dns_bypass`/`remove_dns_bypass` added for redirect mode support.
+- **SessionManager**: Call `add_dns_bypass(ip)` in `create_session()` and `remove_dns_bypass(ip)` in `expire_session()` — always, unconditionally.
+- **base.html**: Add DHCP nav link in sidebar (superadmin-only, matching existing pattern)
 
 ---
 
@@ -259,7 +376,7 @@ One-time setup script (called during `install.sh`):
 
 - dnsmasq must be installed separately via `setup-dnsmasq.sh` — not auto-installed by the FastAPI app
 - File writes go to `/etc/dnsmasq.d/captive-portal.conf` — requires root
-- `reload_dnsmasq()` uses subprocess, same pattern as `iptables.py` and `tc.py`
+- All subprocess calls use the existing `_run()` helper pattern from `iptables.py`
 - `write_config()` and `reload_dnsmasq()` are called synchronously in the PUT handler (fast operations, < 1s)
 - Tests mock all subprocess calls and file I/O — no actual dnsmasq required for tests
 
@@ -269,13 +386,20 @@ One-time setup script (called during `install.sh`):
 
 | Mode | Behavior | Use case |
 |------|----------|----------|
-| `redirect` | dnsmasq answers ALL DNS queries with portal IP (`address=/#/<gateway_ip>`) | Pre-auth captive portal detection — mobile OS detects portal faster |
-| `forward` | dnsmasq forwards DNS to upstream (8.8.8.8) normally | Sites that need DNS to work pre-auth, or when iptables HTTP redirect is sufficient |
+| `redirect` | dnsmasq answers ALL DNS with portal IP; authenticated guest DNS is DNAT'd to 8.8.8.8 via iptables | Best captive portal detection on iOS/Android |
+| `forward` | dnsmasq forwards DNS to upstream normally; iptables HTTP redirect handles portal detection | Simpler; works for most devices |
 
-**Recommended default:** `redirect` — works best with iOS/Android captive portal detection.
+**Recommended default:** `redirect`.
 
-After guest authenticates, iptables allows their traffic through (including DNS port 53 to upstream). However, since dnsmasq is the advertised DNS server, authenticated guests' DNS still goes through dnsmasq on the gateway. In `redirect` mode this means their DNS is answered with portal IP even after auth — which would break internet.
+**DNS bypass iptables rules** (added by `add_dns_bypass(ip)`, removed by `remove_dns_bypass(ip)`):
+```bash
+# Add (on auth):
+iptables -t nat -I PREROUTING -s <ip> -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+iptables -t nat -I PREROUTING -s <ip> -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53
 
-**Solution:** When a guest authenticates, `SessionManager.create_session()` also adds an iptables rule allowing the guest's DNS to bypass dnsmasq (DNAT port 53 from whitelisted IPs to upstream directly). This is handled in `app/network/iptables.py` — add `add_dns_bypass(ip)` and `remove_dns_bypass(ip)`.
+# Remove (on expire):
+iptables -t nat -D PREROUTING -s <ip> -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+iptables -t nat -D PREROUTING -s <ip> -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+```
 
-Alternatively (simpler): use `forward` mode and rely on iptables HTTP redirect for captive portal detection (already works for most devices). `redirect` mode is available as an option for environments where HTTP redirect alone is insufficient.
+These rules are in the `nat` table `PREROUTING` chain, which runs before the `filter` table — so they intercept DNS before dnsmasq's catch-all can respond.
