@@ -31,6 +31,7 @@ class SessionManager:
             guest_id=guest_id,
             voucher_id=voucher_id,
             expires_at=expires_at,
+            bandwidth_up_kbps=bandwidth_up_kbps,
             status=SessionStatus.active,
         )
         db.add(session)
@@ -43,7 +44,7 @@ class SessionManager:
 
     async def expire_session(self, db: AsyncSession, session: Session, status: SessionStatus = SessionStatus.expired) -> None:
         remove_whitelist(session.ip_address)
-        remove_bandwidth_limit(session.ip_address, self.wan_if)
+        remove_bandwidth_limit(session.ip_address, session.bandwidth_up_kbps, self.wan_if)
         session.status = status
         await db.commit()
         logger.info(f"Session {session.id} expired ({status.value})")

@@ -35,21 +35,24 @@ async def test_expire_session_removes_whitelist(manager):
     mock_db = AsyncMock()
     mock_session = MagicMock()
     mock_session.ip_address = "192.168.1.45"
+    mock_session.bandwidth_up_kbps = 2048
     mock_session.status.value = "active"
 
     with patch("app.network.session_manager.remove_whitelist") as mock_ipt, \
          patch("app.network.session_manager.remove_bandwidth_limit") as mock_tc:
         await manager.expire_session(db=mock_db, session=mock_session)
         mock_ipt.assert_called_once_with("192.168.1.45")
-        mock_tc.assert_called_once_with("192.168.1.45", "eth0")
+        mock_tc.assert_called_once_with("192.168.1.45", 2048, "eth0")
 
 @pytest.mark.asyncio
 async def test_expire_overdue_sessions_returns_count(manager):
     mock_session_1 = MagicMock()
     mock_session_1.ip_address = "192.168.1.10"
+    mock_session_1.bandwidth_up_kbps = 1024
     mock_session_1.status = MagicMock()
     mock_session_2 = MagicMock()
     mock_session_2.ip_address = "192.168.1.11"
+    mock_session_2.bandwidth_up_kbps = 2048
     mock_session_2.status = MagicMock()
 
     mock_result = MagicMock()
@@ -70,8 +73,10 @@ async def test_expire_sessions_for_room_expires_active_sessions(manager):
     from app.core.models import Guest, SessionStatus
     mock_session_1 = MagicMock()
     mock_session_1.ip_address = "192.168.1.10"
+    mock_session_1.bandwidth_up_kbps = 1024
     mock_session_2 = MagicMock()
     mock_session_2.ip_address = "192.168.1.11"
+    mock_session_2.bandwidth_up_kbps = 2048
 
     mock_result = MagicMock()
     mock_result.scalars.return_value.all.return_value = [mock_session_1, mock_session_2]
