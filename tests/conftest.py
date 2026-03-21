@@ -12,11 +12,11 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 @pytest_asyncio.fixture
 async def client():
-    # Patch iptables, tc, DB for portal tests
-    with patch("app.network.iptables.add_whitelist"), \
-         patch("app.network.iptables.remove_whitelist"), \
-         patch("app.network.iptables.add_dns_bypass"), \
-         patch("app.network.iptables.remove_dns_bypass"), \
+    # Patch nftables, tc, DB for portal tests
+    with patch("app.network.nftables.NftablesManager.add_to_whitelist"), \
+         patch("app.network.nftables.NftablesManager.remove_from_whitelist"), \
+         patch("app.network.nftables.NftablesManager.add_dns_bypass"), \
+         patch("app.network.nftables.NftablesManager.remove_dns_bypass"), \
          patch("app.network.tc.apply_bandwidth_limit"), \
          patch("app.network.tc.remove_bandwidth_limit"), \
          patch("app.network.arp.get_mac_for_ip", return_value=None), \
