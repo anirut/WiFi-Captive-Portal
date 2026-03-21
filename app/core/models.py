@@ -150,7 +150,7 @@ class DhcpConfig(Base):
     subnet: Mapped[str] = mapped_column(String(18), nullable=False, default="192.168.0.0/22", server_default="'192.168.0.0/22'")
     dhcp_range_start: Mapped[str] = mapped_column(String(15), nullable=False, default="192.168.0.10", server_default="'192.168.0.10'")
     dhcp_range_end: Mapped[str] = mapped_column(String(15), nullable=False, default="192.168.3.250", server_default="'192.168.3.250'")
-    lease_time: Mapped[str] = mapped_column(String(8), nullable=False, default="8h", server_default="'8h'")
+    lease_time: Mapped[str] = mapped_column(String(12), nullable=False, default="8h", server_default="'8h'")
     dns_upstream_1: Mapped[str] = mapped_column(String(45), nullable=False, default="8.8.8.8", server_default="'8.8.8.8'")
     dns_upstream_2: Mapped[str] = mapped_column(String(45), nullable=False, default="8.8.4.4", server_default="'8.8.4.4'")
     dns_mode: Mapped[DnsModeType] = mapped_column(

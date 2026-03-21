@@ -36,7 +36,7 @@ def upgrade() -> None:
         sa.Column('dns_upstream_1', sa.String(45), nullable=False, server_default="'8.8.8.8'"),
         sa.Column('dns_upstream_2', sa.String(45), nullable=False, server_default="'8.8.4.4'"),
         sa.Column('dns_mode', sa.Enum('redirect', 'forward', name='dnsmodetype', create_type=False),
-                  nullable=False, server_default='redirect'),
+                  nullable=False, server_default="'redirect'"),
         sa.Column('log_queries', sa.Boolean, nullable=False, server_default='false'),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
