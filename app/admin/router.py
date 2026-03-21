@@ -328,9 +328,10 @@ async def download_voucher_pdf(
         raise HTTPException(404, {"error": "not_found"})
     if qr_mode not in ("url", "code"):
         raise HTTPException(422, {"error": "invalid_qr_mode"})
+    portal_url = f"http://{settings.PORTAL_IP}:{settings.PORTAL_PORT}"
     pdf = _gen_pdf([{"code": v.code, "type": v.type.value,
                      "duration_minutes": v.duration_minutes, "data_limit_mb": v.data_limit_mb}],
-                   qr_mode=qr_mode)
+                   qr_mode=qr_mode, portal_url=portal_url)
     return _Response(content=pdf, media_type="application/pdf",
                      headers={"Content-Disposition": f'attachment; filename="voucher-{v.code}.pdf"'})
 
