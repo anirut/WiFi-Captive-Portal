@@ -63,7 +63,7 @@ echo ""
 ask "Stop and remove systemd service? [Y/n]:"
 read -r RM_SERVICE; RM_SERVICE="${RM_SERVICE:-Y}"
 
-ask "Remove iptables and tc network rules? [Y/n]:"
+ask "Remove nftables and tc network rules? [Y/n]:"
 read -r RM_NETWORK; RM_NETWORK="${RM_NETWORK:-Y}"
 
 ask "Drop database '${DB_NAME}' and user '${DB_USER}'? [y/N]:"
@@ -118,12 +118,10 @@ if [[ "${RM_NETWORK:-Y}" =~ ^[Yy]$ ]]; then
     PORTAL_IP_VAL="${PORTAL_IP:-192.168.1.1}"
     PORTAL_PORT_VAL="${PORTAL_PORT:-8080}"
 
-    info "Flushing iptables rules on $WIFI_IF..."
-    iptables -F FORWARD 2>/dev/null || true
-    iptables -t nat -F PREROUTING 2>/dev/null || true
-    # Reset FORWARD default to ACCEPT (open policy after uninstall)
+    info "Flushing nftables rules..."
+    nft delete table inet captive_portal 2>/dev/null || true
     iptables -P FORWARD ACCEPT 2>/dev/null || true
-    success "iptables rules removed."
+    success "nftables rules removed."
 
     info "Removing tc qdisc on $WAN_IF..."
     tc qdisc del dev "$WAN_IF" root 2>/dev/null || true
