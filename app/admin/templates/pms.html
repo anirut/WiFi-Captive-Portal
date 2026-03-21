@@ -105,7 +105,7 @@
       Verify that the current PMS adapter can connect and respond to a health check.
     </p>
     <button hx-post="/admin/pms/test" hx-target="#test-result"
-            hx-vals='{"type": "{{ adapter_type or 'standalone' }}", "config": {}}'
+            hx-vals='{"type": "{{ adapter_type or &quot;standalone&quot; }}", "config": {}}'
             class="px-6 py-2 rounded text-white font-medium"
             style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
       Test Connection
