@@ -50,7 +50,10 @@ async def get_current_admin(request: Request) -> dict:
     if not payload:
         _raise_or_redirect(request)
     redis = request.app.state.redis
-    if await redis.exists(f"blocklist:{payload['jti']}"):
+    jti = payload.get("jti")
+    if not jti:
+        _raise_or_redirect(request)
+    if await redis.exists(f"blocklist:{jti}"):
         _raise_or_redirect(request)
     return payload
 

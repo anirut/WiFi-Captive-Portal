@@ -30,6 +30,7 @@ async def test_logout_blocklists_token(client):
     assert app.state.redis.set.called
     call_args = app.state.redis.set.call_args
     assert call_args[0][0].startswith("blocklist:")
+    assert call_args[1].get("ex", 0) > 0  # TTL must be set
 
 @pytest.mark.asyncio
 async def test_blocklisted_token_rejected(client):
@@ -55,5 +56,4 @@ async def test_cookie_auth_accepted(client):
         "/admin/sessions",
         cookies={"admin_token": token},
     )
-    # Should not return 401 (may return 200 or redirect based on DB mock)
-    assert resp.status_code != 401
+    assert resp.status_code == 200

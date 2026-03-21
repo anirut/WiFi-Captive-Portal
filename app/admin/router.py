@@ -1,5 +1,4 @@
 import time
-import time as _time
 import uuid
 import bcrypt as _bcrypt
 from datetime import datetime, timezone
@@ -47,12 +46,14 @@ async def admin_login(body: AdminLoginRequest, db: AsyncSession = Depends(get_db
 
 @router.post("/logout")
 async def admin_logout(request: Request, payload: dict = Depends(get_current_admin)):
-    jti = payload["jti"]
+    jti = payload.get("jti", "")
+    if not jti:
+        raise HTTPException(status_code=400, detail={"error": "token_missing_jti"})
     exp = payload["exp"]
-    remaining_ttl = max(1, int(exp - _time.time()))
+    remaining_ttl = max(1, int(exp - time.time()))
     await request.app.state.redis.set(f"blocklist:{jti}", 1, ex=remaining_ttl)
     response = JSONResponse({"status": "logged_out"})
-    response.delete_cookie("admin_token")
+    response.delete_cookie("admin_token", httponly=True, samesite="lax")
     return response
 
 
