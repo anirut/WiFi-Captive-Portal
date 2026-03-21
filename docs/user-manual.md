@@ -1,7 +1,8 @@
 # คู่มือการใช้งาน WiFi Captive Portal
 
 > สำหรับ: ผู้ดูแลระบบ (Admin) และ เจ้าหน้าที่โรงแรม
-> เวอร์ชัน: Phase 2
+> เวอร์ชัน: Phase 3 (Admin Dashboard + DHCP/DNS)
+> อัปเดต: 2026-03-21
 
 ---
 
@@ -22,7 +23,7 @@
 
 **ใช้เมื่อ:** แขกที่เช็คอินผ่านระบบ PMS ของโรงแรม
 
-1. เลือกแท็บ **"Room Login"** (หรือ "เข้าสู่ระบบด้วยห้องพัก")
+1. เลือกแท็บ **"Room Login"** (หรือ "เข้าสู่ระบบด้วยห้องพัก
 2. กรอกข้อมูล:
    - **Room Number** — หมายเลขห้องพัก เช่น `101`, `502A`
    - **Last Name** — นามสกุล (ตรงกับที่ลงทะเบียนเช็คอิน)
@@ -34,6 +35,7 @@
 - ❌ ล้มเหลว → ข้อความแสดง error:
   - `guest_not_checked_in` — ชื่อ/ห้องไม่ตรงกับระบบโรงแรม ให้ติดต่อ Front Desk
   - `rate_limited` — พยายามหลายครั้งเกินไป รอ 10 นาทีแล้วลองใหม่
+  - `max_devices_reached` — ถึงจำนวนอุปกรณ์สูงสุดที่อนุญาต
 
 **ระยะเวลา Session:**
 - Session มีอายุถึงเวลา **Check-out** ที่กำหนดไว้ในระบบ
@@ -58,7 +60,8 @@
   - `no_uses_remaining` — รหัสถูกใช้จนครบแล้ว
 
 **ระยะเวลา Session:**
-- ตามที่กำหนดไว้ใน Voucher (เช่น 2 ชั่วโมง, 24 ชั่วโมง)
+- **Time-based voucher**: ตามระยะเวลาที่กำหนด (เช่น 2 ชม., 24 ชม.)
+- **Data-based voucher**: ใช้ได้จนกว่าจะถึงโควต้าข้อมูล (เช่น 500MB) — ระบบจะตัด session อัตโนมัติเมื่อใช้ครบ
 
 ---
 
@@ -69,8 +72,6 @@
 1. เปิดหน้า Portal อีกครั้งที่ `http://192.168.1.1:8080`
 2. กดปุ่ม **"Disconnect"** (หรือ "ตัดการเชื่อมต่อ")
 
-หรือส่ง POST request ไปที่ `/session/disconnect`
-
 ---
 
 ## ส่วนที่ 2: สำหรับผู้ดูแลระบบ (Admin)
@@ -79,497 +80,432 @@
 
 **URL:** `http://192.168.1.1:8080/admin`
 
-> **หมายเหตุ:** ปัจจุบัน Admin Panel ไม่ต้องการ authentication (planned feature)
-> ในการ Deploy จริง ควรจำกัดการเข้าถึง Admin URL ด้วย firewall หรือ VPN
+**การ Login:**
+1. กรอก Username และ Password
+2. กด **"Login"**
+3. ระบบจะจดจำ session ไว้ 8 ชั่วโมง (ตาม `JWT_EXPIRE_HOURS`)
+
+**Roles และสิทธิ์:**
+| Role | สิทธิ์การเข้าถึง |
+|------|------------------|
+| **superadmin** | เข้าได้ทุก menu |
+| **staff** | Dashboard, Sessions, Vouchers เท่านั้น |
 
 ---
 
-### 2.2 ดูรายการ Session ที่ Active
+### 2.2 Dashboard
 
-**Endpoint:** `GET /admin/sessions`
+**Menu:** Dashboard
+**Role:** staff + superadmin
 
-**ตัวอย่างผลลัพธ์:**
-```json
-[
-  {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "ip": "192.168.1.105",
-    "connected_at": "2026-03-21T08:30:00+00:00",
-    "expires_at": "2026-03-23T12:00:00+00:00"
-  },
-  {
-    "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-    "ip": "192.168.1.110",
-    "connected_at": "2026-03-21T10:15:00+00:00",
-    "expires_at": "2026-03-21T12:15:00+00:00"
-  }
-]
-```
+แสดงข้อมูลภาพรวมระบบ:
 
-**ตัวอย่าง curl:**
-```bash
-curl http://192.168.1.1:8080/admin/sessions
-```
+| Card | รายละเอียด |
+|------|-----------|
+| 📊 **Active Sessions** | จำนวนแขกที่กำลังใช้งาน WiFi |
+| 🎟️ **Vouchers Used Today** | Voucher ที่ถูกใช้วันนี้ |
+| 📥 **Total Bytes Down Today** | ปริมาณข้อมูลที่โหลดวันนี้ |
+| 📋 **Recent Sessions** | 10 sessions ล่าสุด พร้อมปุ่ม Kick |
 
 ---
 
-### 2.3 Kick Session (ตัด WiFi แขก)
+### 2.3 Sessions Management
 
-**Endpoint:** `DELETE /admin/sessions/{session_id}`
+**Menu:** Sessions
+**Role:** staff + superadmin
 
-**ตัวอย่าง:**
-```bash
-curl -X DELETE http://192.168.1.1:8080/admin/sessions/550e8400-e29b-41d4-a716-446655440000
-```
+#### รายการ Active Sessions
 
-**ผลลัพธ์:**
-```json
-{"status": "kicked"}
-```
+ตารางแสดงข้อมูล:
 
-**สิ่งที่เกิดขึ้น:**
-1. ลบ iptables rule สำหรับ IP ของแขก
-2. ลบ tc bandwidth limit
-3. อัปเดต session status เป็น `kicked`
-4. แขกจะไม่สามารถเชื่อมต่อได้ทันที
+| Column | รายละเอียด |
+|--------|-----------|
+| IP Address | IP ของอุปกรณ์แขก |
+| Room / Voucher | หมายเลขห้อง หรือ voucher code |
+| Connected At | เวลาเริ่มเชื่อมต่อ |
+| Expires At | เวลาหมดอายุ session |
+| Bytes Down | ปริมาณข้อมูลที่โหลด (human-readable) |
+| Status | สถานะ (active) |
+| Action | ปุ่ม Kick |
 
----
+#### Kick Session
+1. กดปุ่ม **"Kick"** ที่แถวของ session นั้น
+2. ระบบจะ:
+   - ลบ nftables whitelist entry
+   - ลบ tc bandwidth limit
+   - ลบ DNS bypass rule
+   - อัปเดต status เป็น `kicked`
+3. แขกจะถูกตัดการเชื่อมต่อทันที
 
-### 2.4 ตั้งค่า PMS Integration
-
-#### ดูการตั้งค่าปัจจุบัน
-
-```bash
-curl http://192.168.1.1:8080/admin/pms
-```
-
-**ผลลัพธ์:**
-```json
-{
-  "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-  "type": "cloudbeds",
-  "is_active": true,
-  "last_sync_at": "2026-03-21T10:00:00+00:00",
-  "config": {
-    "api_url": "https://api.cloudbeds.com",
-    "api_key": "***",
-    "property_id": "hotel123"
-  }
-}
-```
-
-> Credentials จะถูกซ่อนด้วย `***` เพื่อความปลอดภัย
+#### Auto-refresh
+- รายการ refresh อัตโนมัติทุก 30 วินาที
 
 ---
 
-#### ตั้งค่า PMS แต่ละประเภท
+### 2.4 Vouchers Management
+
+**Menu:** Vouchers
+**Role:** staff + superadmin
+
+#### สร้าง Voucher เดี่ยว
+
+1. กด **"New Voucher"**
+2. กรอกข้อมูล:
+   - **Type**:
+     - `time` — กำหนดระยะเวลา
+     - `data` — กำหนดปริมาณข้อมูล
+   - **Duration (minutes)**: ระยะเวลา (ถ้า type=time)
+   - **Data Limit (MB)**: โควต้าข้อมูล (ถ้า type=data)
+   - **Max Uses**: ใช้ได้กี่ครั้ง (default: 1)
+   - **Max Devices**: อุปกรณ์ต่อ session (default: 1)
+   - **Expires At**: วันหมดอายุ voucher (optional)
+3. กด **"Create"**
+4. ระบบจะ generate code อัตโนมัติ
+
+#### Batch Generate Vouchers
+
+1. กด **"Batch Generate"**
+2. กรอก **Count** (1-100)
+3. ตั้งค่าอื่น ๆ เหมือน voucher เดี่ยว
+4. กด **"Generate"**
+5. ระบบจะสร้าง vouchers หลายตัวพร้อม codes ที่ generate อัตโนมัติ
+
+#### Export Voucher PDF
+
+1. กดปุ่ม **"PDF"** ที่ voucher ที่ต้องการ
+2. เลือก **QR Mode**:
+   - **URL** — QR code = portal URL (แนะนำ แขกแสกนแล้วเปิดหน้า login)
+   - **Code** — QR code = voucher code เฉย ๆ
+3. PDF จะ download อัตโนมัติ
+4. PDF ประกอบด้วย:
+   - Voucher code (ข้อความ)
+   - QR code
+   - ระยะเวลา/โควต้า
+   - ชื่อโรงแรม
+
+#### รายการ Vouchers
+
+ตารางแสดง:
+- Code
+- Type (time/data)
+- Duration / Data Limit
+- Used Count / Max Uses
+- Max Devices
+- Expires At
+- Created At
+- Actions (PDF, Delete)
+
+---
+
+### 2.5 Rooms & Policies
+
+**Menu:** Rooms & Policies
+**Role:** superadmin only
+
+#### Policies Tab
+
+**สร้าง Policy:**
+Policy คือชุดการตั้งค่า bandwidth และอุปกรณ์สำหรับห้องประเภทต่าง ๆ
+
+1. กด **"New Policy"**
+2. กรอก:
+   - **Name**: ชื่อ policy (เช่น "Standard Room", "VIP Suite")
+   - **Upload Bandwidth (kbps)**: 0 = ไม่จำกัด
+   - **Download Bandwidth (kbps)**: 0 = ไม่จำกัด
+   - **Session Duration (min)**: 0 = ถึง check-out
+   - **Max Devices**: จำนวนอุปกรณ์สูงสุด (default: 3)
+3. กด **"Save"**
+
+**ตัวอย่าง Policies:**
+| Policy | Upload | Download | Duration | Max Devices |
+|--------|--------|----------|----------|-------------|
+| Standard | 0 | 5120 (5 Mbps) | 0 | 3 |
+| Deluxe | 0 | 10240 (10 Mbps) | 0 | 4 |
+| Suite | 0 | 0 (unlimited) | 0 | 5 |
+| Meeting Room | 0 | 2048 (2 Mbps) | 120 (2 ชม.) | 10 |
+
+#### Rooms Tab
+
+**Assign Policy ให้ห้อง:**
+1. ดูรายการห้องทั้งหมด
+2. เลือก **Policy** จาก dropdown ที่แถวของห้องนั้น
+3. ระบบจะบันทึกอัตโนมัติ (HTMX)
+4. Policy จะมีผลกับ session ใหม่เท่านั้น (session เดิมไม่เปลี่ยน)
+
+---
+
+### 2.6 Analytics
+
+**Menu:** Analytics
+**Role:** superadmin only
+
+#### Time Range Selector
+เลือกช่วงเวลา: **24h**, **7d**, **30d**
+
+#### Charts (Chart.js)
+
+**1. Sessions Over Time** (Line Chart)
+- แกน X: เวลา
+- แกน Y: จำนวน active sessions
+- แสดงแนวโน้มการใช้งาน
+
+**2. Bandwidth Per Hour** (Stacked Bar Chart)
+- แกน X: เวลา
+- แกน Y: bytes (up + down stacked)
+- แสดงปริมาณการใช้ข้อมูล
+
+**3. Peak Hours Heatmap**
+- แกน X: ชั่วโมง (0-23)
+- แกน Y: วันในสัปดาห์ (Sun-Sat)
+- สี: ความเข้ม = จำนวน sessions
+- ช่วยวางแผน capacity
+
+**4. Auth Breakdown** (Pie Chart)
+- Room Authentication vs Voucher Authentication
+- แสดงสัดส่วนวิธี login
+
+---
+
+### 2.7 PMS Settings
+
+**Menu:** PMS Settings
+**Role:** superadmin only
+
+#### เลือก PMS Type
+
+| Type | Protocol | Checkout Sync |
+|------|----------|---------------|
+| Opera Cloud | REST/OAuth2 | Webhook |
+| Opera FIAS | TCP/XML | Polling (5 min) |
+| Cloudbeds | REST/API Key | Polling (5 min) |
+| Mews | REST | Webhook |
+| Custom | REST | Polling (5 min) |
+| Standalone | Local DB | N/A |
+
+#### Configuration Fields
 
 **Opera Cloud:**
-```bash
-curl -X PUT http://192.168.1.1:8080/admin/pms \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "opera_cloud",
-    "config": {
-      "api_url": "https://api.oracle.com/ohip",
-      "client_id": "your_client_id",
-      "client_secret": "your_client_secret",
-      "hotel_id": "HOTEL_CODE"
-    }
-  }'
-```
+| Field | รายละเอียด |
+|-------|-----------|
+| API URL | OHIP API base URL |
+| Client ID | OAuth2 client ID |
+| Client Secret | OAuth2 client secret |
+| Hotel ID | Hotel code |
 
-**Opera FIAS (Opera 5 / Suite8):**
-```bash
-curl -X PUT http://192.168.1.1:8080/admin/pms \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "opera_fias",
-    "config": {
-      "host": "192.168.50.10",
-      "port": "10000",
-      "auth_key": "YOUR_AUTH_KEY",
-      "vendor_id": "WIFI_PORTAL"
-    }
-  }'
-```
+**Opera FIAS:**
+| Field | รายละเอียด |
+|-------|-----------|
+| Host | FIAS server IP |
+| Port | TCP port (usually 10000) |
+| Auth Key | Authentication key |
+| Vendor ID | Vendor identifier |
 
 **Cloudbeds:**
-```bash
-curl -X PUT http://192.168.1.1:8080/admin/pms \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "cloudbeds",
-    "config": {
-      "api_url": "https://api.cloudbeds.com",
-      "api_key": "your_api_key",
-      "property_id": "your_property_id"
-    }
-  }'
-```
+| Field | รายละเอียด |
+|-------|-----------|
+| API URL | API base URL (default: api.cloudbeds.com) |
+| API Key | API key |
+| Property ID | Property ID |
 
 **Mews:**
-```bash
-curl -X PUT http://192.168.1.1:8080/admin/pms \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "mews",
-    "config": {
-      "api_url": "https://www.mews.li",
-      "client_token": "your_client_token",
-      "access_token": "your_access_token"
-    }
-  }'
-```
+| Field | รายละเอียด |
+|-------|-----------|
+| API URL | API base URL (default: www.mews.li) |
+| Client Token | Client token |
+| Access Token | Access token |
 
-**Custom REST PMS:**
-```bash
-curl -X PUT http://192.168.1.1:8080/admin/pms \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "custom",
-    "config": {
-      "api_url": "https://pms.yourhotal.com",
-      "auth_type": "bearer",
-      "token": "your_api_token",
-      "verify_endpoint": "/api/guest/verify",
-      "guest_by_room_endpoint": "/api/guest/by-room",
-      "checkouts_endpoint": "/api/guest/checkouts",
-      "health_endpoint": "/api/health",
-      "field_map": {
-        "pms_id": "data.reservationId",
-        "room_number": "data.roomNumber",
-        "last_name": "data.guest.lastName",
-        "first_name": "data.guest.firstName",
-        "check_in": "data.checkInDate",
-        "check_out": "data.checkOutDate"
-      }
-    }
-  }'
-```
+**Custom:**
+| Field | รายละเอียด |
+|-------|-----------|
+| API URL | Base URL |
+| Auth Type | bearer / basic |
+| Token/Username/Password | Credentials |
+| Verify Endpoint | Path for guest verification |
+| Field Map | JSON path mapping |
 
-**Standalone (ไม่มี PMS):**
-```bash
-curl -X PUT http://192.168.1.1:8080/admin/pms \
-  -H "Content-Type: application/json" \
-  -d '{"type": "standalone", "config": {}}'
-```
+#### Test Connection
+- กด **"Test Connection"**
+- ระบบจะทดสอบการเชื่อมต่อและแสดง:
+  - Status: OK / Failed
+  - Latency (ms)
+  - Error message (ถ้า failed)
 
 ---
 
-#### ทดสอบการเชื่อมต่อ PMS
+### 2.8 Brand & Config
 
-```bash
-curl -X POST http://192.168.1.1:8080/admin/pms/test \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "cloudbeds",
-    "config": {
-      "api_url": "https://api.cloudbeds.com",
-      "api_key": "your_api_key",
-      "property_id": "your_property_id"
-    }
-  }'
-```
+**Menu:** Brand & Config
+**Role:** superadmin only
 
-**ผลลัพธ์ (เชื่อมต่อได้):**
-```json
-{"ok": true, "latency_ms": 145.3, "error": null}
-```
+#### Brand Settings
 
-**ผลลัพธ์ (เชื่อมต่อไม่ได้):**
-```json
-{"ok": false, "latency_ms": 5002.1, "error": "Connection timeout"}
-```
+| Field | รายละเอียด | Default |
+|-------|-----------|---------|
+| Hotel Name | ชื่อโรงแรม (แสดงใน portal) | Hotel WiFi |
+| Primary Color | สีหลัก (hex code) | #3B82F6 |
+| Language | ภาษาหลัก | th |
 
----
+#### Logo Upload
 
-### 2.5 ตั้งค่า Webhook สำหรับ Opera Cloud / Mews
+1. กด **"Choose File"** ในส่วน Logo
+2. เลือกรูป (รองรับ: PNG, JPG, WebP)
+3. ขนาดสูงสุด: **2 MB**
+4. กด **"Upload"**
+5. Logo จะแสดงใน:
+   - Portal login page
+   - Admin sidebar
+   - Voucher PDF
 
-Webhook ทำให้ระบบทราบการเช็คเอาท์แบบ real-time โดยไม่ต้อง poll
+#### Terms & Conditions
 
-**ขั้นตอน:**
-
-**1. สร้าง webhook secret**
-```bash
-# สร้าง random secret
-SECRET=$(openssl rand -hex 32)
-echo "Webhook Secret: $SECRET"
-
-# คำนวณ hash ที่จะเก็บใน DB
-SECRET_HASH=$(echo -n "$SECRET" | sha256sum | cut -d' ' -f1)
-echo "Hash to store: $SECRET_HASH"
-```
-
-**2. บันทึก hash ลงใน database**
-```sql
--- เชื่อมต่อ DB แล้วรัน:
-UPDATE pms_adapters
-SET webhook_secret = 'SECRET_HASH_ที่คำนวณได้'
-WHERE is_active = true;
-```
-
-**3. ตั้งค่า Webhook URL ใน PMS ของคุณ**
-
-| PMS | Webhook URL |
-|-----|-------------|
-| Opera Cloud | `http://YOUR_PORTAL_IP:8080/internal/pms/webhook/{adapter_uuid}` |
-| Mews | `http://YOUR_PORTAL_IP:8080/internal/pms/webhook/{adapter_uuid}` |
-
-**4. ตั้งค่า Header ใน PMS**
-- Header: `X-PMS-Secret`
-- Value: ค่า Secret (ไม่ใช่ hash) ที่สร้างในขั้นตอนที่ 1
-
-**5. ทดสอบ Webhook**
-```bash
-# ค้นหา adapter_id
-psql -U captive -d captive_portal -c "SELECT id FROM pms_adapters WHERE is_active = true;"
-
-# ทดสอบ Opera Cloud event
-curl -X POST http://192.168.1.1:8080/internal/pms/webhook/YOUR_ADAPTER_UUID \
-  -H "Content-Type: application/json" \
-  -H "X-PMS-Secret: YOUR_SECRET" \
-  -d '{"eventType": "CHECKED_OUT", "roomNumber": "101"}'
-
-# ผลลัพธ์ที่ถูกต้อง:
-# {"ok": true}
-```
+- กรอกข้อความสำหรับ:
+  - **ภาษาไทย** (tc_text_th)
+  - **ภาษาอังกฤษ** (tc_text_en)
+- แขกต้องติ๊กยอมรับก่อน login ได้
 
 ---
 
-### 2.6 จัดการข้อมูลแขก (Standalone Mode)
+### 2.9 Admin Users
 
-ในกรณีที่ใช้ Standalone adapter (ไม่มี PMS) ต้องเพิ่มข้อมูลแขกในฐานข้อมูลเอง:
+**Menu:** Admin Users
+**Role:** superadmin only
 
-```sql
--- เชื่อมต่อ database
-psql -h localhost -U captive -d captive_portal
+#### รายการ Users
 
--- เพิ่มแขก
-INSERT INTO guests (id, room_number, last_name, first_name, check_in, check_out, max_devices)
-VALUES (
-    gen_random_uuid(),
-    '101',
-    'Smith',
-    'John',
-    '2026-03-21 14:00:00+07',
-    '2026-03-23 12:00:00+07',
-    3
-);
+ตารางแสดง:
+| Column | รายละเอียด |
+|--------|-----------|
+| Username | ชื่อผู้ใช้ |
+| Role | superadmin / staff |
+| Last Login | เวลา login ล่าสุด |
+| Actions | Delete (ไม่มี edit) |
 
--- ดูรายการแขกที่เช็คอินอยู่
-SELECT room_number, last_name, first_name, check_in, check_out
-FROM guests
-WHERE check_in <= now() AND check_out >= now()
-ORDER BY room_number;
-```
+#### สร้าง User ใหม่
 
----
+1. กด **"New User"**
+2. กรอก:
+   - **Username**: ชื่อผู้ใช้ (unique)
+   - **Password**: รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)
+   - **Role**:
+     - `superadmin` — เข้าได้ทุก menu
+     - `staff` — เข้าได้เฉพาะ Dashboard, Sessions, Vouchers
+3. กด **"Create"**
 
-### 2.7 จัดการ Voucher
-
-Voucher ต้องจัดการผ่าน Database โดยตรง (Admin UI สำหรับ Voucher อยู่ใน roadmap):
-
-```sql
--- สร้าง Voucher แบบ 2 ชั่วโมง (120 นาที)
-INSERT INTO vouchers (id, code, type, duration_minutes, max_devices, created_by, max_uses)
-VALUES (
-    gen_random_uuid(),
-    'WELCOME1',       -- รหัส (เปลี่ยนได้)
-    'time',
-    120,              -- 2 ชั่วโมง
-    2,                -- ใช้ได้ 2 อุปกรณ์
-    (SELECT id FROM admin_users LIMIT 1),
-    1                 -- ใช้ได้ 1 ครั้ง
-);
-
--- สร้าง Voucher แบบ 24 ชั่วโมง ใช้ได้ 50 คน (Day Pass)
-INSERT INTO vouchers (id, code, type, duration_minutes, max_devices, created_by, max_uses, expires_at)
-VALUES (
-    gen_random_uuid(),
-    'DAYPASS1',
-    'time',
-    1440,             -- 24 ชั่วโมง
-    1,
-    (SELECT id FROM admin_users LIMIT 1),
-    50,               -- ใช้ได้ 50 ครั้ง
-    '2026-12-31 23:59:59+07'  -- หมดอายุสิ้นปี
-);
-
--- ดูรายการ Voucher ทั้งหมด
-SELECT code, type, duration_minutes, used_count, max_uses, expires_at
-FROM vouchers
-ORDER BY created_at DESC;
-```
-
-**สร้าง Voucher Code แบบ Random:**
-```bash
-# ใช้ Python generator ของระบบ
-cd /opt/captive-portal
-.venv/bin/python -c "from app.voucher.generator import generate_code; print(generate_code())"
-```
+**⚠️ ข้อควรระวัง:**
+- ควรมี superadmin อย่างน้อย 1 คนเสมอ
+- Staff ไม่สามารถสร้าง/ลบ users ได้
+- Password ถูก hash ด้วย bcrypt
 
 ---
 
-### 2.8 ดู Logs
+### 2.10 DHCP Settings
 
-```bash
-# ดู logs แบบ real-time
-journalctl -u captive-portal -f
+**Menu:** DHCP
+**Role:** superadmin only
 
-# ดู logs ย้อนหลัง 1 ชั่วโมง
-journalctl -u captive-portal --since "1 hour ago"
+#### Service Status Card
 
-# ดู logs วันนี้
-journalctl -u captive-portal --since today
+แสดงข้อมูล:
+| Item | รายละเอียด |
+|------|-----------|
+| Status Badge | 🟢 Running / 🔴 Stopped |
+| Active Leases | จำนวน DHCP leases ปัจจุบัน |
+| Config File | มี/ไม่มี config file |
+| Reload Button | กดเพื่อ reload dnsmasq |
 
-# ดู error logs เท่านั้น
-journalctl -u captive-portal -p err
+#### Configuration Card
 
-# ตัวอย่าง log ที่ควรเห็น:
-# INFO  Session created: ip=192.168.1.105 guest=101/Smith expires=2026-03-23T12:00:00
-# INFO  Scheduler expired 2 sessions
-# INFO  Poll checkout: room=205, expired 1 sessions
-# INFO  Webhook checkout: room=302, expired 2 sessions
-```
+| Field | รายละเอียด | Default |
+|-------|-----------|---------|
+| **Enabled** | เปิด/ปิด dnsmasq | ✅ |
+| **Interface** | Interface สำหรับ DHCP | wlan0 |
+| **Gateway IP** | IP ของ gateway (server) | 192.168.1.1 |
+| **Subnet** | Subnet in CIDR | 192.168.1.0/24 |
+| **DHCP Range Start** | IP เริ่มต้นสำหรับแจก | 192.168.1.10 |
+| **DHCP Range End** | IP สุดท้ายสำหรับแจก | 192.168.1.250 |
+| **Lease Time** | ระยะเวลา lease | 8h |
+| **DNS Upstream 1** | Primary upstream DNS | 8.8.8.8 |
+| **DNS Upstream 2** | Secondary upstream DNS | 8.8.4.4 |
+| **DNS Mode** | redirect / forward | redirect |
+| **Log Queries** | เปิด DNS/DHCP logging | ❌ |
+
+#### DNS Mode อธิบาย
+
+| Mode | พฤติกรรม | แนะนำเมื่อ |
+|------|----------|----------|
+| **redirect** | dnsmasq ตอบทุก DNS query ด้วย portal IP; authenticated guests ได้รับ DNS bypass | Captive portal มาตรฐาน, ต้องการให้ portal detection ทำงานดี |
+| **forward** | dnsmasq ส่ง DNS queries ต่อไป upstream DNS | มีปัญหากับบางอุปกรณ์, ต้องการความเรียบง่าย |
+
+#### Active Leases Card
+
+ตารางแสดง DHCP leases ปัจจุบัน:
+
+| Column | รายละเอียด |
+|--------|-----------|
+| MAC Address | MAC ของอุปกรณ์ |
+| IP Address | IP ที่ได้รับ |
+| Hostname | ชื่ออุปกรณ์ (ถ้ามี) |
+| Expires At | เวลา lease หมดอายุ |
+
+- Auto-refresh ทุก 30 วินาที
+- มี search box สำหรับ filter
 
 ---
 
-### 2.9 Monitoring และ Health Check
+### 2.11 Logout
 
-**ตรวจสอบสถานะระบบ:**
-```bash
-# ใช้ test script
-bash /opt/captive-portal/scripts/test.sh
-
-# ผลลัพธ์ตัวอย่าง:
-#   ── System ──
-#   ✓  python3 >= 3.12 available
-#   ✓  iptables available
-#   ✓  tc (iproute2) available
-#   ✓  psql client available
-#   ✓  redis-cli available
-#
-#   ── PostgreSQL ──
-#   ✓  PostgreSQL service running
-#   ✓  DB host reachable (localhost:5432)
-#   ✓  DB 'captive_portal' exists
-#   ✓  Table 'guests' exists
-#   ✓  Table 'sessions' exists
-#   ✓  Admin user exists (1 user(s))
-#
-#   ── Redis ──
-#   ✓  Redis service running
-#   ✓  Redis responds to PING
-#
-#   ── Network Rules ──
-#   ✓  iptables FORWARD rules present
-#   ✓  iptables NAT PREROUTING redirect present
-#   ✓  tc HTB qdisc on eth0
-#
-#   ── HTTP Endpoints ──
-#   ✓  Portal root / responds (HTTP 2xx/3xx)
-#   ✓  Admin /admin/sessions endpoint exists
-#
-#   ━━━ Result: ALL TESTS PASSED (21/21) ━━━
-```
-
-**ตรวจสอบ Active Sessions:**
-```bash
-# ผ่าน API
-curl -s http://localhost:8080/admin/sessions | python3 -m json.tool
-
-# ผ่าน Database โดยตรง
-psql -U captive -d captive_portal -c "
-  SELECT s.ip_address, g.room_number, g.last_name,
-         s.connected_at, s.expires_at, s.status
-  FROM sessions s
-  LEFT JOIN guests g ON s.guest_id = g.id
-  WHERE s.status = 'active'
-  ORDER BY s.connected_at DESC;
-"
-```
+- กด **"Logout"** ที่มุมขวาบน (top bar)
+- Token จะถูกเพิ่มเข้า Redis blocklist
+- Cookie จะถูกลบ
+- ต้อง login ใหม่เพื่อเข้าใช้งาน
 
 ---
 
 ## ส่วนที่ 3: การ Configure ขั้นสูง
 
-### 3.1 Bandwidth Policy
+### 3.1 Webhook Setup (Opera Cloud / Mews)
 
-กำหนด bandwidth limit ตามประเภทห้อง:
+Webhook ทำให้ระบบรับ checkout event แบบ real-time (ไม่ต้องรอ polling)
 
-```sql
--- สร้าง Policy สำหรับห้อง Standard (5 Mbps download)
-INSERT INTO policies (id, name, bandwidth_up_kbps, bandwidth_down_kbps, session_duration_min, max_devices)
-VALUES (
-    gen_random_uuid(),
-    'Standard Room Policy',
-    0,      -- Upload: ไม่จำกัด (ยังไม่รองรับ)
-    5120,   -- Download: 5 Mbps (5120 kbps)
-    0,      -- Duration: ถึง check-out
-    3       -- Max 3 devices
-);
+**ขั้นตอน:**
 
--- สร้าง Policy สำหรับ Suite (ไม่จำกัด)
-INSERT INTO policies (id, name, bandwidth_up_kbps, bandwidth_down_kbps, session_duration_min, max_devices)
-VALUES (
-    gen_random_uuid(),
-    'Suite Policy',
-    0,
-    0,      -- ไม่จำกัด
-    0,
-    5
-);
+1. **สร้าง webhook secret:**
+```bash
+SECRET=$(openssl rand -hex 32)
+echo "Webhook Secret: $SECRET"
+```
 
--- เชื่อม Policy กับห้อง
-UPDATE rooms SET policy_id = 'POLICY_UUID' WHERE number = '101';
+2. **ตั้งค่าใน PMS:**
+   - Webhook URL: `http://YOUR_PORTAL_IP:8080/internal/pms/webhook/{adapter_id}`
+   - Header: `X-PMS-Secret`
+   - Value: secret จากขั้นตอนที่ 1
 
--- หรือเชื่อมทุกห้องประเภท standard
-UPDATE rooms r
-SET policy_id = p.id
-FROM policies p
-WHERE p.name = 'Standard Room Policy'
-AND r.room_type = 'standard';
+3. **หา adapter_id:**
+```bash
+psql -U captive -d captive_portal -c "SELECT id FROM pms_adapters WHERE is_active = true;"
+```
+
+4. **ทดสอบ:**
+```bash
+curl -X POST http://192.168.1.1:8080/internal/pms/webhook/YOUR_ADAPTER_UUID \
+  -H "Content-Type: application/json" \
+  -H "X-PMS-Secret: YOUR_SECRET" \
+  -d '{"eventType": "CHECKED_OUT", "roomNumber": "101"}'
 ```
 
 ---
 
-### 3.2 Environment Variables ขั้นสูง
+### 3.2 Backup & Restore
 
-แก้ไขไฟล์ `.env`:
-
+**Backup:**
 ```bash
-sudo nano /opt/captive-portal/.env
-```
-
-**ตัวอย่างการปรับค่า:**
-```bash
-# เพิ่มจำนวนครั้ง login ต่อ 10 นาที (default: 5)
-AUTH_RATE_LIMIT_ATTEMPTS=10
-
-# เปลี่ยน window เป็น 5 นาที
-AUTH_RATE_LIMIT_WINDOW_SECONDS=300
-
-# ปรับ port (ถ้าต้องการ)
-PORTAL_PORT=80
-```
-
-หลังแก้ไข `.env` ต้อง restart service:
-```bash
-sudo systemctl restart captive-portal
-```
-
----
-
-### 3.3 Backup Database
-
-```bash
-# Backup
 PGPASSWORD=your_password pg_dump \
     -h localhost -U captive captive_portal \
     > backup_$(date +%Y%m%d_%H%M%S).sql
+```
 
-# Restore
+**Restore:**
+```bash
 PGPASSWORD=your_password psql \
     -h localhost -U captive captive_portal \
     < backup_20260321_120000.sql
@@ -577,18 +513,19 @@ PGPASSWORD=your_password psql \
 
 ---
 
-### 3.4 ตั้งค่า SSL/HTTPS (Production)
+### 3.3 SSL/HTTPS Setup
 
-แนะนำให้ใช้ Nginx เป็น reverse proxy:
+แนะนำให้ใช้ Nginx reverse proxy:
 
 ```bash
+# Install Nginx
 sudo apt-get install -y nginx certbot python3-certbot-nginx
 
-# ตั้งค่า Nginx
+# Create config
 sudo tee /etc/nginx/sites-available/captive-portal <<'EOF'
 server {
     listen 80;
-    server_name portal.yourhotal.com;
+    server_name portal.yourhotel.com;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -599,11 +536,12 @@ server {
 }
 EOF
 
+# Enable site
 sudo ln -s /etc/nginx/sites-available/captive-portal /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl restart nginx
 
-# SSL Certificate (ถ้ามี domain)
-sudo certbot --nginx -d portal.yourhotal.com
+# Get SSL certificate
+sudo certbot --nginx -d portal.yourhotel.com
 ```
 
 ---
@@ -616,72 +554,32 @@ sudo certbot --nginx -d portal.yourhotal.com
 |------|---------|---------|
 | `guest_not_checked_in` | แขกไม่พบในระบบ PMS | ตรวจสอบชื่อ/ห้องกับ Front Desk |
 | `rate_limited` | Login มากเกินไป | รอ 10 นาทีแล้วลองใหม่ |
+| `max_devices_reached` | ถึงจำนวนอุปกรณ์สูงสุด | รอ session เก่าหมดอายุ หรือติดต่อ Admin |
 | `invalid_code` | Voucher ไม่ถูกต้อง | ตรวจสอบรหัสกับเจ้าหน้าที่ |
 | `expired` | Voucher/Session หมดอายุ | ขอรหัสใหม่ |
 | `no_uses_remaining` | Voucher ใช้ครบแล้ว | ขอรหัสใหม่ |
 | `pms_unavailable` | PMS ไม่ตอบสนอง | ติดต่อ IT หรือใช้ Standalone mode |
-| `adapter_not_found` | Webhook ID ไม่ถูกต้อง | ตรวจสอบ UUID ใน URL |
-| `invalid_secret` | Webhook secret ไม่ตรง | ตรวจสอบ X-PMS-Secret header |
-| `no_active_adapter` | ไม่มี PMS ที่ active | ตั้งค่า PMS ผ่าน PUT /admin/pms |
-| `not_found` | Session ไม่พบ | Session อาจหมดอายุไปแล้ว |
+| `unauthorized` | Admin token ไม่ถูกต้อง/หมดอายุ | Login ใหม่ |
+| `forbidden` | ไม่มีสิทธิ์เข้าถึงหน้านี้ | ติดต่อ superadmin |
 
 ---
 
-### 4.2 PMS Config Keys Reference
-
-**Opera Cloud:**
-| Key | จำเป็น | รายละเอียด |
-|-----|--------|-----------|
-| `api_url` | ✅ | OHIP API base URL |
-| `client_id` | ✅ | OAuth2 client ID |
-| `client_secret` | ✅ | OAuth2 client secret |
-| `hotel_id` | ✅ | Hotel code ใน Opera |
-
-**Opera FIAS:**
-| Key | จำเป็น | รายละเอียด |
-|-----|--------|-----------|
-| `host` | ✅ | IP ของ Opera FIAS server |
-| `port` | ✅ | TCP port (มักจะเป็น 10000) |
-| `auth_key` | ✅ | Authentication key |
-| `vendor_id` | ✅ | Vendor identifier string |
-
-**Cloudbeds:**
-| Key | จำเป็น | รายละเอียด |
-|-----|--------|-----------|
-| `api_key` | ✅ | Cloudbeds API key |
-| `property_id` | ✅ | Property ID |
-| `api_url` | — | default: `https://api.cloudbeds.com` |
-
-**Mews:**
-| Key | จำเป็น | รายละเอียด |
-|-----|--------|-----------|
-| `client_token` | ✅ | Client token |
-| `access_token` | ✅ | Access token |
-| `api_url` | — | default: `https://www.mews.li` |
-
-**Custom:**
-| Key | จำเป็น | รายละเอียด |
-|-----|--------|-----------|
-| `api_url` | ✅ | Base URL ของ PMS |
-| `auth_type` | ✅ | `bearer` หรือ `basic` |
-| `token` | ✅* | Bearer token (ถ้า auth_type=bearer) |
-| `username` | ✅* | Username (ถ้า auth_type=basic) |
-| `password` | ✅* | Password (ถ้า auth_type=basic) |
-| `verify_endpoint` | ✅ | Path สำหรับ verify_guest |
-| `guest_by_room_endpoint` | ✅ | Path สำหรับ get_guest_by_room |
-| `checkouts_endpoint` | — | Path สำหรับ get_checkouts |
-| `health_endpoint` | — | Path สำหรับ health_check |
-| `field_map` | ✅ | JSON mapping PMS fields → GuestInfo |
-
----
-
-### 4.3 Session Status Values
+### 4.2 Session Status Values
 
 | Status | ความหมาย |
 |--------|---------|
 | `active` | Session กำลังใช้งาน |
-| `expired` | หมดอายุตามเวลา หรือ checkout |
+| `expired` | หมดอายุตามเวลา, checkout, หรือ data quota ครบ |
 | `kicked` | ถูก Admin หรือแขกตัดเอง |
+
+---
+
+### 4.3 Voucher Types
+
+| Type | ความหมาย | การตัด session |
+|------|---------|---------------|
+| `time` | กำหนดระยะเวลา (นาที) | เมื่อถึงเวลาที่กำหนด |
+| `data` | กำหนดปริมาณข้อมูล (MB) | เมื่อ bytes_down >= quota (ตรวจทุก 60 วินาที) |
 
 ---
 
@@ -689,19 +587,45 @@ sudo certbot --nginx -d portal.yourhotal.com
 
 ```bash
 # ปิด WiFi ทุกคน (emergency)
+sudo nft delete table inet captive_portal
 sudo iptables -P FORWARD DROP
-sudo iptables -F FORWARD
 
-# เปิด WiFi ทุกคน (ไม่มี auth)
+# เปิด WiFi ทุกคน (ไม่มี auth - ใช้เฉพาะกรณีฉุกเฉิน)
+sudo nft delete table inet captive_portal
 sudo iptables -P FORWARD ACCEPT
 
 # Reset กลับเป็นปกติ
-sudo bash /opt/captive-portal/scripts/setup-iptables.sh
+sudo bash /opt/captive-portal/scripts/setup-nftables.sh
 
-# ลบ session ทั้งหมดออกจาก DB
+# ลบ session ทั้งหมด (force logout ทุกคน)
 psql -U captive -d captive_portal -c "
   UPDATE sessions SET status='expired' WHERE status='active';
 "
-# แล้ว restart service เพื่อ reset iptables
+# แล้ว restart service
 sudo systemctl restart captive-portal
+
+# ดู whitelist ปัจจุบัน
+sudo nft list set inet captive_portal whitelist
+
+# ดู logs แบบ real-time
+journalctl -u captive-portal -f
+
+# ดู dnsmasq logs
+journalctl -u dnsmasq -f
 ```
+
+---
+
+### 4.5 การดูแลระบบประจำวัน
+
+**แนะนำให้ตรวจสอบ:**
+1. จำนวน active sessions (ผ่าน Dashboard)
+2. ปริมาณ bandwidth ที่ใช้ (ผ่าน Analytics)
+3. Error logs: `journalctl -u captive-portal -p err`
+4. พื้นที่ดิสก์: `df -h`
+5. สถานะ services: `systemctl status captive-portal postgresql redis-server dnsmasq`
+
+**แนะนำให้ทำประจำสัปดาห์:**
+1. Backup database
+2. ตรวจสอบ analytics หา outlier
+3. ลบ vouchers ที่หมดอายุแล้ว
