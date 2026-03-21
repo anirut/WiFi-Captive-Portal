@@ -25,6 +25,7 @@ def _make_app_with_db(mock_db):
 
 @pytest.mark.asyncio
 async def test_login_success():
+    """Form login with correct credentials sets cookie and redirects."""
     import bcrypt as _bcrypt
     from app.core.models import AdminUser, AdminRole
     user = MagicMock(spec=AdminUser)
@@ -41,16 +42,20 @@ async def test_login_success():
     mock_db.commit = AsyncMock()
 
     app = _make_app_with_db(mock_db)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-        resp = await c.post("/admin/login", json={"username": "admin", "password": "secret123"})
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test",
+                           follow_redirects=False) as c:
+        resp = await c.post("/admin/login",
+                            data={"username": "admin", "password": "secret123"},
+                            headers={"Content-Type": "application/x-www-form-urlencoded"})
 
-    assert resp.status_code == 200
-    assert "access_token" in resp.json()
+    assert resp.status_code == 302
+    assert "admin_token" in resp.cookies
     app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
 async def test_login_wrong_password():
+    """Form login with wrong password returns 401 login page."""
     import bcrypt as _bcrypt
     from app.core.models import AdminUser
     user = MagicMock(spec=AdminUser)
@@ -63,7 +68,9 @@ async def test_login_wrong_password():
 
     app = _make_app_with_db(mock_db)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-        resp = await c.post("/admin/login", json={"username": "admin", "password": "wrong"})
+        resp = await c.post("/admin/login",
+                            data={"username": "admin", "password": "wrong"},
+                            headers={"Content-Type": "application/x-www-form-urlencoded"})
 
     assert resp.status_code == 401
     app.dependency_overrides.clear()

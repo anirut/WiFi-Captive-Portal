@@ -45,7 +45,7 @@ async def login_page(request: Request):
     return _templates.TemplateResponse("login.html", {"request": request, "error": None})
 
 
-@router.post("/login/form", response_class=HTMLResponse, include_in_schema=False)
+@router.post("/login", response_class=HTMLResponse, include_in_schema=False)
 async def login_submit(request: Request, db: AsyncSession = Depends(get_db)):
     form = await request.form()
     username = form.get("username", "")
@@ -80,17 +80,6 @@ async def dashboard_page(request: Request, payload: dict = Depends(get_current_a
         "flash": flash,
     })
 
-
-@router.post("/login", response_model=TokenResponse)
-async def admin_login(body: AdminLoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(AdminUser).where(AdminUser.username == body.username))
-    user = result.scalar_one_or_none()
-    if not user or not _verify_password(body.password, user.password_hash):
-        raise HTTPException(status_code=401, detail={"error": "invalid_credentials"})
-    user.last_login_at = datetime.now(timezone.utc)
-    await db.commit()
-    token = create_access_token({"sub": user.username, "role": user.role.value})
-    return TokenResponse(access_token=token)
 
 @router.post("/logout")
 async def admin_logout(request: Request, payload: dict = Depends(get_current_admin)):

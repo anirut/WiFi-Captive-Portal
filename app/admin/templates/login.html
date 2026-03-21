@@ -18,7 +18,7 @@
     {% if error %}
     <div class="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">{{ error }}</div>
     {% endif %}
-    <form method="post" action="/admin/login/form{% if request.query_params.get('next') %}?next={{ request.query_params.get('next') }}{% endif %}" class="space-y-4">
+    <form method="post" action="/admin/login{% if request.query_params.get('next') %}?next={{ request.query_params.get('next') }}{% endif %}" class="space-y-4">
       <div>
         <label class="block text-sm text-slate-300 mb-1">Username</label>
         <input name="username" type="text" autocomplete="username" required
