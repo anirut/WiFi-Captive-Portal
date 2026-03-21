@@ -49,6 +49,12 @@ The current WiFi Captive Portal uses `iptables` for firewall/NAT and `tc` (HTB) 
 | `.env.example` | Add `DNS_UPSTREAM_IP=8.8.8.8` |
 | `tests/conftest.py` | Update patches |
 | `tests/test_network/test_session_manager.py` | Update mock imports |
+| `scripts/install.sh` | Replace `setup-iptables.sh` + `setup-tc.sh` with `setup-nftables.sh` |
+| `scripts/uninstall.sh` | Replace iptables flush with nftables flush |
+| `scripts/test.sh` | Replace iptables checks with nftables checks |
+| `docs/installation-guide.md` | Update all references from iptables to nftables |
+| `docs/features.md` | Update architecture diagram and technology section |
+| `docs/user-manual.md` | Update emergency commands and troubleshooting |
 
 ## Architecture
 
@@ -528,3 +534,244 @@ sudo systemctl restart captive-portal
 - [ ] Manual testing: session expiration removes IP from sets
 - [ ] Manual testing: flowtables offload established connections
 - [ ] Performance: CPU usage lower than iptables baseline
+
+---
+
+## Script Updates
+
+### scripts/install.sh Changes
+
+Replace iptables/tc setup with nftables:
+
+```bash
+# BEFORE (lines 390-403):
+info "Setting up iptables rules..."
+WIFI_IF="$WIFI_INTERFACE" PORTAL_IP="$PORTAL_IP" PORTAL_PORT="$PORTAL_PORT" \
+    bash "$SCRIPT_DIR/setup-iptables.sh"
+
+info "Setting up tc HTB traffic shaping..."
+WAN_IF="$WAN_INTERFACE" \
+    bash "$SCRIPT_DIR/setup-tc.sh"
+
+# AFTER:
+info "Setting up nftables + flowtables + tc..."
+bash "$SCRIPT_DIR/setup-nftables.sh" \
+    --wifi "$WIFI_INTERFACE" \
+    --wan "$WAN_INTERFACE" \
+    --portal-ip "$PORTAL_IP" \
+    --portal-port "$PORTAL_PORT" \
+    --dns-ip "${DNS_UPSTREAM_IP:-8.8.8.8}"
+```
+
+### scripts/uninstall.sh Changes
+
+Replace iptables flush with nftables flush:
+
+```bash
+# BEFORE (lines 121-136):
+info "Flushing iptables rules on $WIFI_IF..."
+iptables -F FORWARD 2>/dev/null || true
+iptables -t nat -F PREROUTING 2>/dev/null || true
+iptables -P FORWARD ACCEPT 2>/dev/null || true
+success "iptables rules removed."
+
+# AFTER:
+info "Flushing nftables rules..."
+nft delete table inet captive_portal 2>/dev/null || true
+success "nftables rules removed."
+```
+
+### scripts/test.sh Changes
+
+Replace iptables checks with nftables checks:
+
+```bash
+# BEFORE (lines 187-196):
+# iptables
+if command -v iptables &>/dev/null; then
+    run_check "iptables FORWARD rules present" bash -c \
+        "iptables -L FORWARD -n 2>/dev/null | grep -q '$WIFI_INTERFACE'"
+
+    run_check "iptables NAT PREROUTING redirect present" bash -c \
+        "iptables -t nat -L PREROUTING -n 2>/dev/null | grep -q '$PORTAL_PORT'"
+else
+    warn_result "iptables not available — skipping firewall checks"
+fi
+
+# AFTER:
+# nftables
+if command -v nft &>/dev/null; then
+    run_check "nftables table exists" bash -c \
+        "nft list table inet captive_portal 2>/dev/null | grep -q 'whitelist'"
+
+    run_check "nftables flowtable configured" bash -c \
+        "nft list table inet captive_portal 2>/dev/null | grep -q 'flowtable'"
+else
+    fail "nftables not available — required for v2.0"
+fi
+```
+
+---
+
+## Documentation Updates
+
+### docs/installation-guide.md Changes
+
+| Section | Change |
+|---------|--------|
+| **Software Requirements** | Replace `iptables` with `nftables (4.16+ kernel)` |
+| **Manual Step 9** | Replace `setup-iptables.sh` + `setup-tc.sh` with `setup-nftables.sh` |
+| **systemd Service** | Update `ExecStartPre` to use single `setup-nftables.sh` |
+| **Verify iptables rules** | Replace with "Verify nftables rules" section |
+| **Troubleshooting: iptables** | Replace with "Troubleshooting: nftables" section |
+| **Reset network rules** | Replace commands with nftables equivalents |
+
+#### Updated Software Requirements Table
+
+```markdown
+### Software
+| Package | เวอร์ชันขั้นต่ำ |
+|---------|--------------|
+| Ubuntu | 22.04 LTS |
+| Python | 3.12+ |
+| PostgreSQL | 12+ |
+| Redis | 6+ |
+| nftables | 0.9.3+ (kernel 4.16+) |
+| iproute2 (tc) | (pre-installed) |
+| dnsmasq | 2.x |
+```
+
+#### Updated Step 9 (Manual Installation)
+
+```bash
+# nftables + flowtables + tc (ต้องรัน root)
+sudo bash scripts/setup-nftables.sh \
+    --wifi wlan0 \
+    --wan eth0 \
+    --portal-ip 192.168.1.1 \
+    --portal-port 8080 \
+    --dns-ip 8.8.8.8
+```
+
+#### Updated Verify Commands
+
+```bash
+# ดู nftables table
+sudo nft list table inet captive_portal
+
+# ดู whitelist set
+sudo nft list set inet captive_portal whitelist
+
+# ดู tc rules (unchanged)
+sudo tc qdisc show dev eth0
+sudo tc class show dev eth0
+```
+
+#### Updated Troubleshooting Section
+
+```bash
+### nftables ไม่ทำงาน
+
+# ตรวจว่า nftables ติดตั้ง
+nft --version
+
+# ตรวจ kernel version (ต้อง >= 4.16 สำหรับ flowtables)
+uname -r
+
+# ตรวจว่า table มีอยู่
+nft list tables
+
+# รัน setup-nftables.sh ใหม่
+sudo bash scripts/setup-nftables.sh --wifi wlan0 --wan eth0
+```
+
+### docs/features.md Changes
+
+| Section | Change |
+|---------|--------|
+| **Architecture Diagram** | Replace `iptables/tc Gateway` with `nftables/tc Gateway` |
+| **เทคโนโลยีที่ใช้** | Replace `iptables + tc` with `nftables + flowtables + tc` |
+| **Network Security** | Update iptables DROP to nftables reference |
+| **DNS Bypass** | Update iptables DNAT to nftables reference |
+
+#### Updated Technology Table
+
+```markdown
+| ส่วนประกอบ | เทคโนโลยี |
+|-----------|-----------|
+| Web Framework | FastAPI (Python 3.12) |
+| Database | PostgreSQL 14+ (asyncpg) |
+| Cache / Rate Limit / Token Blocklist | Redis |
+| ORM | SQLAlchemy 2.0 (Async) |
+| Migration | Alembic |
+| Network Control | nftables + flowtables + tc (iproute2) |
+| DHCP + DNS | dnsmasq |
+```
+
+### docs/user-manual.md Changes
+
+| Section | Change |
+|---------|--------|
+| **2.3 Kick Session** | Update iptables reference to nftables |
+| **4.4 คำสั่งฉุกเฉิน** | Replace iptables commands with nftables equivalents |
+
+#### Updated Emergency Commands
+
+```bash
+# ปิด WiFi ทุกคน (emergency)
+sudo nft delete table inet captive_portal
+sudo iptables -P FORWARD DROP
+
+# เปิด WiFi ทุกคน (ไม่มี auth - ใช้เฉพาะกรณีฉุกเฉิน)
+sudo nft delete table inet captive_portal
+sudo iptables -P FORWARD ACCEPT
+
+# Reset กลับเป็นปกติ
+sudo bash /opt/captive-portal/scripts/setup-nftables.sh
+
+# ดู whitelist ปัจจุบัน
+sudo nft list set inet captive_portal whitelist
+```
+
+---
+
+## systemd Service Update
+
+### /etc/systemd/system/captive-portal.service
+
+```bash
+# BEFORE:
+ExecStartPre=$SCRIPT_DIR/setup-iptables.sh
+ExecStartPre=$SCRIPT_DIR/setup-tc.sh
+
+# AFTER:
+ExecStartPre=$SCRIPT_DIR/setup-nftables.sh
+```
+
+Full updated service file:
+
+```ini
+[Unit]
+Description=WiFi Captive Portal
+Documentation=https://github.com/your-org/wifi-captive-portal
+After=network.target postgresql.service redis-server.service
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/captive-portal
+EnvironmentFile=/opt/captive-portal/.env
+ExecStartPre=/opt/captive-portal/scripts/setup-nftables.sh
+ExecStart=/opt/captive-portal/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 1
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=captive-portal
+
+[Install]
+WantedBy=multi-user.target
+```
