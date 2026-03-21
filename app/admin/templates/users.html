@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Admin Users{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h2 class="text-2xl font-semibold text-white">Admin Users</h2>
+    <p class="text-xs text-slate-400 mt-1">Superadmin-only — manage staff and superadmin accounts</p>
+  </div>
+</div>
+
+{% if flash %}
+<div class="mb-4 px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-sm">
+  {{ flash }}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-3 gap-6">
+
+  <!-- Users Table -->
+  <div class="col-span-2 glass rounded-xl p-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Existing Users</h3>
+    <div id="users-table">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-400 border-b border-white/10">
+            <th class="pb-3 font-medium">Username</th>
+            <th class="pb-3 font-medium">Role</th>
+            <th class="pb-3 font-medium">Last Login</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5">
+          {% for u in users %}
+          <tr class="hover:bg-white/5 transition-colors">
+            <td class="py-3 text-white font-medium">{{ u.username }}</td>
+            <td class="py-3">
+              {% if u.role.value == 'superadmin' %}
+              <span class="px-2 py-0.5 rounded text-xs font-medium" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">superadmin</span>
+              {% else %}
+              <span class="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-slate-300">staff</span>
+              {% endif %}
+            </td>
+            <td class="py-3 text-slate-400">
+              {{ u.last_login_at.strftime('%Y-%m-%d %H:%M') if u.last_login_at else 'Never' }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="3" class="py-6 text-center text-slate-500 text-sm">No admin users found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Create User Form -->
+  <div class="glass rounded-xl p-6" x-data="{ loading: false, result: null, error: null }">
+    <h3 class="text-lg font-semibold text-white mb-4">Create User</h3>
+    <form class="space-y-4"
+          @submit.prevent="
+            loading = true; result = null; error = null;
+            const fd = new FormData($el);
+            const body = Object.fromEntries(fd.entries());
+            fetch('/admin/api/users', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (document.cookie.match(/admin_token=([^;]+)/) || [])[1] || ''},
+              body: JSON.stringify(body)
+            }).then(r => r.json().then(d => ({ status: r.status, data: d }))).then(({ status, data }) => {
+              loading = false;
+              if (status === 201) { result = 'User created: ' + data.username; $el.reset(); }
+              else { error = data.detail?.error || 'Error creating user'; }
+            }).catch(() => { loading = false; error = 'Network error'; })
+          ">
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Username</label>
+        <input name="username" type="text" required placeholder="e.g. frontdesk1"
+               class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"/>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Password</label>
+        <input name="password" type="password" required placeholder="Min 8 characters"
+               class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"/>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Role</label>
+        <select name="role"
+                class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+          <option value="staff" class="bg-slate-800">Staff</option>
+          <option value="superadmin" class="bg-slate-800">Superadmin</option>
+        </select>
+      </div>
+      <button type="submit" :disabled="loading"
+              class="w-full py-2 rounded text-white font-medium transition-opacity"
+              style="background:linear-gradient(135deg,#6366f1,#8b5cf6)"
+              :class="loading ? 'opacity-60 cursor-not-allowed' : ''">
+        <span x-show="!loading">Create User</span>
+        <span x-show="loading">Creating...</span>
+      </button>
+      <div x-show="result" x-text="result" class="text-sm text-green-400 mt-2"></div>
+      <div x-show="error" x-text="error" class="text-sm text-red-400 mt-2"></div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

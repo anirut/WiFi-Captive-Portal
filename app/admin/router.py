@@ -526,6 +526,45 @@ async def analytics_page(
     })
 
 
+# ── Admin Users ───────────────────────────────────────────────────────────────
+
+class AdminUserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = "staff"  # "staff" | "superadmin"
+
+
+@router.get("/api/users")
+async def list_admin_users(db: AsyncSession = Depends(get_db), _: dict = Depends(require_superadmin)):
+    result = await db.execute(select(AdminUser))
+    return [{"id": str(u.id), "username": u.username, "role": u.role.value,
+             "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None}
+            for u in result.scalars().all()]
+
+
+@router.post("/api/users", status_code=201)
+async def create_admin_user(body: AdminUserCreate, db: AsyncSession = Depends(get_db),
+                             _: dict = Depends(require_superadmin)):
+    from app.core.models import AdminRole
+    pw_hash = _bcrypt.hashpw(body.password.encode(), _bcrypt.gensalt()).decode()
+    user = AdminUser(username=body.username, password_hash=pw_hash, role=AdminRole(body.role))
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return {"id": str(user.id), "username": user.username, "role": user.role.value}
+
+
+@router.get("/users", response_class=HTMLResponse, include_in_schema=False)
+async def users_page(request: Request, payload: dict = Depends(require_superadmin),
+                     db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(AdminUser))
+    users = result.scalars().all()
+    flash = request.session.pop("flash", None)
+    return _templates.TemplateResponse("users.html", {
+        "request": request, "current_user": payload, "users": users, "flash": flash,
+    })
+
+
 # ── Brand & Config ────────────────────────────────────────────────────────────
 
 ALLOWED_LOGO_MIME = {"image/jpeg", "image/png", "image/webp"}
