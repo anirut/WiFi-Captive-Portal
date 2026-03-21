@@ -1,13 +1,13 @@
 # WiFi Captive Portal — รายละเอียดโปรแกรมและฟีเจอร์
 
-> เวอร์ชัน: Phase 2 (PMS Integration)
+> เวอร์ชัน: Phase 3 (Admin Dashboard + DHCP/DNS)
 > อัปเดต: 2026-03-21
 
 ---
 
 ## 1. ภาพรวมระบบ
 
-WiFi Captive Portal คือระบบควบคุมการเข้าถึงอินเทอร์เน็ตสำหรับโรงแรม โดยแขกจะต้องยืนยันตัวตนก่อนจึงจะใช้งาน WiFi ได้ รองรับการเชื่อมต่อกับระบบ PMS (Property Management System) หลายประเภท เพื่อให้แขกล็อกอินด้วยหมายเลขห้องและนามสกุลที่ลงทะเบียนในระบบโรงแรมได้โดยตรง
+WiFi Captive Portal คือระบบควบคุมการเข้าถึงอินเทอร์เน็ตสำหรับโรงแรม โดยแขกจะต้องยืนยันตัวตนก่อนจึงจะใช้งาน WiFi ได้ รองรับการเชื่อมต่อกับระบบ PMS (Property Management System) หลายประเภท พร้อม Admin Dashboard แบบเต็มรูปแบบและระบบ DHCP/DNS ในตัว
 
 ### สถาปัตยกรรม
 
@@ -15,7 +15,12 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Hotel Network                            │
 │                                                                 │
-│  Guest Device ──► WiFi AP ──► [iptables/tc Gateway] ──► Internet│
+│  Guest Device ──► WiFi AP ──► [nftables/tc Gateway] ──► Internet│
+│                      │              │                           │
+│                      │              ▼                           │
+│                      │    ┌────────────────────┐                │
+│                      └───►│ dnsmasq (DHCP+DNS) │                │
+│                           └────────────────────┘                │
 │                                     │                           │
 │                                     ▼                           │
 │                           WiFi Captive Portal                   │
@@ -33,14 +38,17 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 |-----------|-----------|
 | Web Framework | FastAPI (Python 3.12) |
 | Database | PostgreSQL 14+ (asyncpg) |
-| Cache / Rate Limit | Redis |
+| Cache / Rate Limit / Token Blocklist | Redis |
 | ORM | SQLAlchemy 2.0 (Async) |
 | Migration | Alembic |
-| Network Control | iptables + tc (iproute2) |
+| Network Control | nftables + flowtables + tc (iproute2) |
+| DHCP + DNS | dnsmasq |
 | Scheduler | APScheduler 3.x |
-| Frontend | Jinja2 + CSS (Glassmorphism) |
+| Frontend | Jinja2 + HTMX + Alpine.js + Tailwind CSS |
+| Charts | Chart.js |
+| PDF Generation | reportlab + qrcode |
 | Encryption | Fernet (cryptography library) |
-| Auth | JWT (python-jose) |
+| Auth | JWT (python-jose) + bcrypt |
 
 ---
 
@@ -53,12 +61,13 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 - ระบบตรวจสอบกับ PMS ว่าแขกเช็คอินอยู่จริง
 - Session มีอายุถึงวันเช็คเอาท์หรือตาม Policy ที่ตั้งไว้
 - รองรับ T&C Acceptance (ต้องยอมรับเงื่อนไขก่อนใช้งาน)
+- จำกัดจำนวนอุปกรณ์ต่อแขก (max_devices)
 
 #### ยืนยันด้วย Voucher Code
 - แขกกรอก **รหัส Voucher** 8 หลัก (เช่น `K9ZXYB7Q`)
 - รองรับ 2 ประเภท:
   - **Time-based** — กำหนดระยะเวลา (นาที)
-  - **Data-based** — กำหนดปริมาณข้อมูล (MB)
+  - **Data-based** — กำหนดปริมาณข้อมูล (MB) — ระบบจะตัด session อัตโนมัติเมื่อใช้ครบโควต้า
 - ควบคุมจำนวนครั้งที่ใช้ได้ (`max_uses`)
 - กำหนดวันหมดอายุได้
 
@@ -75,7 +84,8 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 - บันทึก IP address และ MAC address ของอุปกรณ์
 - ตั้งเวลาหมดอายุตาม check-out หรือ policy
 - เพิ่มกฎ iptables เพื่อให้ traffic ผ่านได้
-- ใส่ bandwidth limit ผ่าน tc (Linux Traffic Control)
+- ใส่ bandwidth limit ผ่าน tc (Linux Traffic Control) — ทั้ง **Download** และ **Upload**
+- เพิ่ม DNS bypass rule สำหรับ authenticated guests (redirect mode)
 
 #### การหมดอายุ Session
 | วิธี | รายละเอียด |
@@ -86,12 +96,19 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 | **Polling** | Cloudbeds / Custom / FIAS poll ทุก 5 นาที |
 | **Manual Kick** | Admin ตัด session ผ่านหน้า admin |
 | **Self Disconnect** | แขกกด Disconnect เอง |
+| **Data Quota Exceeded** | Voucher แบบ data-based ใช้ครบโควต้า |
 
 #### Bandwidth Shaping (QoS)
-- กำหนด **Download** limit ต่อ IP ได้ (kbps)
+- กำหนด **Download** และ **Upload** limit ต่อ IP ได้ (kbps)
 - ใช้ HTB (Hierarchical Token Bucket) ผ่าน `tc`
+- Download: ควบคุมบน WAN interface
+- Upload: ควบคุมบน IFB (Intermediate Functional Block) device
 - Class ID คำนวณจาก 2 octet สุดท้ายของ IP
-- Traffic ที่ไม่มี limit จะไหลผ่านที่ 1000 Mbps (unlimited)
+
+#### Bytes Tracking
+- ติดตาม bytes_up และ bytes_down ทุก 60 วินาที
+- ใช้สำหรับ data-based voucher enforcement
+- บันทึกลง database สำหรับ analytics
 
 ---
 
@@ -131,22 +148,10 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 - **Auth:** Bearer token หรือ HTTP Basic Auth
 - **Field Mapping:** dot-notation JSON path (เช่น `data.guest.surname`)
 - **Config:** กำหนด endpoint ทุกตัวได้เอง พร้อม `field_map`
-- **ตัวอย่าง field_map:**
-  ```json
-  {
-    "pms_id":      "reservation.id",
-    "room_number": "reservation.room",
-    "last_name":   "guest.surname",
-    "first_name":  "guest.given_name",
-    "check_in":    "reservation.arrival",
-    "check_out":   "reservation.departure"
-  }
-  ```
 
 #### Standalone (ไม่มี PMS)
 - บันทึกข้อมูลแขกใน local database โดยตรง
 - ใช้ได้กับโรงแรมที่ไม่มีระบบ PMS
-- Admin เพิ่ม Guest record เองผ่าน DB
 
 ---
 
@@ -159,53 +164,91 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 - รองรับ Opera Cloud และ Mews
 - เมื่อรับ checkout event → ตัด session ทุก session ของห้องนั้นทันที
 
-**ตัวอย่าง payload Opera Cloud:**
-```json
-{
-  "eventType": "CHECKED_OUT",
-  "roomNumber": "101"
-}
-```
+---
 
-**ตัวอย่าง payload Mews:**
-```json
-{
-  "Type": "ReservationUpdated",
-  "State": "Checked_out",
-  "RoomNumber": "202"
-}
-```
+### 2.5 DHCP + DNS (dnsmasq)
+
+ระบบมี dnsmasq ในตัวสำหรับให้บริการ DHCP และ DNS:
+
+#### DHCP Features
+- กำหนด IP range สำหรับแขกได้
+- ตั้งค่า lease time (30m, 1h, 4h, 8h, 12h, 24h)
+- Gateway และ DNS server แนบไปกับ DHCP response
+- ดูรายการ lease ปัจจุบันได้ใน Admin UI
+
+#### DNS Modes
+| Mode | พฤติกรรม | ข้อดี |
+|------|----------|-------|
+| **redirect** | ตอบ DNS ทุก domain ด้วย portal IP; authenticated guests ได้รับ DNS bypass | Captive portal detection ทำงานได้ดีที่สุด |
+| **forward** | ส่ง DNS query ต่อไปยัง upstream DNS | ง่ายกว่า ใช้ได้กับอุปกรณ์ส่วนใหญ่ |
+
+#### DNS Bypass (redirect mode)
+- Authenticated guests ได้รับ nftables DNAT rule ส่ง DNS ไปยัง 8.8.8.8 โดยตรง
+- ข้าม dnsmasq catch-all redirect
+- ทำให้ใช้อินเทอร์เน็ตได้ปกติหลัง login
 
 ---
 
-### 2.5 Admin Panel
+### 2.6 Admin Dashboard
 
-#### จัดการ Session
-| Feature | รายละเอียด |
-|---------|-----------|
-| ดู Active Sessions | แสดง IP, เวลาเชื่อมต่อ, เวลาหมดอายุ |
-| Kick Session | ตัด session ทันที + ลบ iptables/tc rules |
+Admin Dashboard แบบเต็มรูปแบบพร้อม UI สวยงาม (Glassmorphism design):
 
-#### จัดการ PMS
-| Feature | รายละเอียด |
-|---------|-----------|
-| ดู Config | แสดง config ปัจจุบัน (ซ่อน credentials ด้วย `***`) |
-| อัปเดต Config | บันทึก + เข้ารหัส + reload adapter ทันที |
-| ทดสอบ Config | ทดสอบการเชื่อมต่อ + วัด latency |
+#### Authentication
+- Login ด้วย username/password
+- JWT token เก็บใน httpOnly cookie
+- Redis-based token blocklist (jti) สำหรับ logout
+- รองรับ 2 roles: **superadmin** และ **staff**
+
+#### Dashboard Modules
+
+| Module | รายละเอียด | Role |
+|--------|-----------|------|
+| **Dashboard** | สถิติภาพรวม, active sessions, recent activity | staff + superadmin |
+| **Sessions** | รายการ session ที่ active, kick session, HTMX polling | staff + superadmin |
+| **Vouchers** | สร้าง/ลบ voucher, batch generate, PDF export พร้อม QR | staff + superadmin |
+| **Rooms & Policies** | จัดการ policies, assign policy ให้ห้อง | superadmin only |
+| **Analytics** | Charts: sessions, bandwidth, peak hours, auth breakdown | superadmin only |
+| **PMS Settings** | ตั้งค่า PMS adapter, test connection | superadmin only |
+| **Brand & Config** | Logo, ชื่อโรงแรม, สี, Terms & Conditions, ภาษา | superadmin only |
+| **Admin Users** | สร้าง/จัดการ staff accounts | superadmin only |
+| **DHCP** | ตั้งค่า DHCP/DNS, ดู leases, reload dnsmasq | superadmin only |
+
+#### Voucher PDF Export
+- สร้าง PDF พร้อม QR code ได้ 2 โหมด:
+  - **URL mode**: QR = portal URL (แขกแสกนแล้วเปิดหน้า login พร้อม voucher code)
+  - **Code mode**: QR = voucher code เฉย ๆ
+- Batch export หลาย voucher ในไฟล์เดียว
 
 ---
 
-### 2.6 ความปลอดภัย (Security)
+### 2.7 Analytics
+
+#### Usage Snapshots
+- Scheduler บันทึก snapshot ทุก 1 ชั่วโมง
+- เก็บ: active sessions, total bytes up/down, voucher uses
+
+#### Charts (Chart.js)
+- **Sessions over time**: เส้นแสดงจำนวน sessions
+- **Bandwidth per hour**: stacked bar (up + down)
+- **Peak hours heatmap**: วัน/เวลาที่มีคนใช้เยอะที่สุด
+- **Auth breakdown**: pie chart แยก room auth vs voucher auth
+
+#### Time Ranges
+- 24 hours, 7 days, 30 days
+
+---
+
+### 2.8 ความปลอดภัย (Security)
 
 #### การเข้ารหัส
 - **PMS Credentials:** เข้ารหัสด้วย Fernet (AES-128-CBC + HMAC-SHA256)
 - **Admin Passwords:** bcrypt hash
-- **JWT:** HMAC-SHA256 signing
+- **JWT:** HMAC-SHA256 signing พร้อม jti สำหรับ revocation
 
 #### Network Security
 - **Webhook Signature:** HMAC-SHA256 + `hmac.compare_digest` (timing-safe)
 - **Rate Limiting:** Redis-backed counter ต่อ IP
-- **iptables DROP:** default drop สำหรับ unauthenticated traffic
+- **nftables DROP:** default drop สำหรับ unauthenticated traffic
 - **DNS Allow:** อนุญาต port 53 เพื่อ captive portal detection
 
 #### Config Security
@@ -242,6 +285,8 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 | `expires_at` | DateTime(tz) | เวลาหมดอายุ |
 | `bytes_up` | BigInteger | Upload (bytes) |
 | `bytes_down` | BigInteger | Download (bytes) |
+| `bandwidth_up_kbps` | Integer | Upload limit |
+| `bandwidth_down_kbps` | Integer | Download limit |
 | `status` | Enum | `active` / `expired` / `kicked` |
 
 ### ตาราง vouchers
@@ -277,16 +322,6 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 | `session_duration_min` | Integer | ระยะเวลา session (0 = ถึงเช็คเอาท์) |
 | `max_devices` | Integer | จำนวนอุปกรณ์สูงสุด (default: 3) |
 
-### ตาราง pms_adapters
-| คอลัมน์ | ชนิด | รายละเอียด |
-|---------|------|-----------|
-| `id` | UUID | Primary key |
-| `type` | Enum | ประเภท PMS |
-| `config_encrypted` | LargeBinary | Config ที่เข้ารหัสด้วย Fernet |
-| `is_active` | Boolean | เปิดใช้งานหรือไม่ |
-| `last_sync_at` | DateTime(tz) | เวลา sync ล่าสุด |
-| `webhook_secret` | String(200) | SHA-256 hash ของ webhook secret |
-
 ### ตาราง admin_users
 | คอลัมน์ | ชนิด | รายละเอียด |
 |---------|------|-----------|
@@ -295,6 +330,43 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 | `password_hash` | String(200) | bcrypt hash |
 | `role` | Enum | `superadmin` / `staff` |
 | `last_login_at` | DateTime(tz) | เวลา login ล่าสุด |
+
+### ตาราง brand_config
+| คอลัมน์ | ชนิด | รายละเอียด |
+|---------|------|-----------|
+| `id` | UUID | Primary key (fixed) |
+| `hotel_name` | String(200) | ชื่อโรงแรม |
+| `logo_path` | String(500) | Path ของ logo |
+| `primary_color` | String(7) | สีหลัก (hex) |
+| `tc_text_th` | Text | Terms & Conditions (ไทย) |
+| `tc_text_en` | Text | Terms & Conditions (อังกฤษ) |
+| `language` | Enum | `th` / `en` |
+
+### ตาราง dhcp_config
+| คอลัมน์ | ชนิด | รายละเอียด |
+|---------|------|-----------|
+| `id` | UUID | Primary key (fixed) |
+| `enabled` | Boolean | เปิด/ปิด dnsmasq |
+| `interface` | String(32) | Interface สำหรับ DHCP |
+| `gateway_ip` | String(15) | Gateway IP |
+| `subnet` | String(18) | Subnet (CIDR) |
+| `dhcp_range_start` | String(15) | IP เริ่มต้น |
+| `dhcp_range_end` | String(15) | IP สุดท้าย |
+| `lease_time` | String(8) | Lease duration |
+| `dns_upstream_1` | String(45) | Primary DNS |
+| `dns_upstream_2` | String(45) | Secondary DNS |
+| `dns_mode` | Enum | `redirect` / `forward` |
+| `log_queries` | Boolean | เปิด DNS logging |
+
+### ตาราง usage_snapshots
+| คอลัมน์ | ชนิด | รายละเอียด |
+|---------|------|-----------|
+| `id` | UUID | Primary key |
+| `snapshot_at` | DateTime(tz) | เวลา snapshot |
+| `active_sessions` | Integer | จำนวน session ขณะนั้น |
+| `total_bytes_up` | BigInteger | รวม upload |
+| `total_bytes_down` | BigInteger | รวม download |
+| `voucher_uses` | Integer | Voucher ใช้ในชั่วโมงนั้น |
 
 ---
 
@@ -311,15 +383,51 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 | `GET` | `/expired` | — | หน้า session expired |
 | `POST` | `/session/disconnect` | — | ตัดการเชื่อมต่อด้วยตนเอง |
 
-### Admin
+### Admin API
 
-| Method | Path | Auth | รายละเอียด |
+| Method | Path | Role | รายละเอียด |
 |--------|------|------|-----------|
-| `GET` | `/admin/sessions` | — | ดูรายการ session ที่ active |
-| `DELETE` | `/admin/sessions/{id}` | — | Kick session |
-| `GET` | `/admin/pms` | — | ดู PMS config (masked) |
-| `PUT` | `/admin/pms` | — | อัปเดต PMS config |
-| `POST` | `/admin/pms/test` | — | ทดสอบการเชื่อมต่อ PMS |
+| `GET` | `/admin/api/sessions` | staff+ | รายการ session ที่ active |
+| `DELETE` | `/admin/api/sessions/{id}` | staff+ | Kick session |
+| `GET` | `/admin/api/pms` | superadmin | ดู PMS config (masked) |
+| `PUT` | `/admin/api/pms` | superadmin | อัปเดต PMS config |
+| `POST` | `/admin/api/pms/test` | superadmin | ทดสอบ PMS connection |
+| `GET` | `/admin/api/policies` | superadmin | รายการ policies |
+| `POST` | `/admin/api/policies` | superadmin | สร้าง policy |
+| `PUT` | `/admin/api/policies/{id}` | superadmin | แก้ไข policy |
+| `DELETE` | `/admin/api/policies/{id}` | superadmin | ลบ policy |
+| `GET` | `/admin/api/rooms` | superadmin | รายการห้อง |
+| `PUT` | `/admin/api/rooms/{id}/policy` | superadmin | Assign policy ให้ห้อง |
+| `GET` | `/admin/api/analytics/data` | superadmin | ข้อมูล analytics |
+| `GET` | `/admin/api/brand` | superadmin | Brand config |
+| `PUT` | `/admin/api/brand` | superadmin | อัปเดต brand |
+| `POST` | `/admin/brand/logo` | superadmin | Upload logo |
+| `GET` | `/admin/api/users` | superadmin | รายการ admin users |
+| `POST` | `/admin/api/users` | superadmin | สร้าง admin user |
+| `GET` | `/admin/api/dhcp` | superadmin | DHCP config |
+| `PUT` | `/admin/api/dhcp` | superadmin | อัปเดต DHCP config |
+| `GET` | `/admin/api/dhcp/status` | superadmin | dnsmasq status |
+| `GET` | `/admin/api/dhcp/leases` | superadmin | DHCP leases |
+| `POST` | `/admin/api/dhcp/reload` | superadmin | Reload dnsmasq |
+| `POST` | `/admin/vouchers/batch` | staff+ | สร้าง vouchers หลายตัว |
+| `GET` | `/admin/vouchers/{id}/pdf` | staff+ | Download voucher PDF |
+| `POST` | `/admin/logout` | staff+ | Logout (token blocklist) |
+
+### Admin HTML Pages
+
+| Path | Role | รายละเอียด |
+|------|------|-----------|
+| `/admin/login` | public | หน้า login |
+| `/admin/` | staff+ | Dashboard |
+| `/admin/sessions` | staff+ | Sessions list |
+| `/admin/vouchers` | staff+ | Vouchers management |
+| `/admin/policies` | superadmin | Policies management |
+| `/admin/rooms` | superadmin | Rooms management |
+| `/admin/analytics` | superadmin | Analytics charts |
+| `/admin/pms` | superadmin | PMS settings |
+| `/admin/brand` | superadmin | Brand & config |
+| `/admin/users` | superadmin | Admin users |
+| `/admin/dhcp` | superadmin | DHCP settings |
 
 ### Internal
 
@@ -329,56 +437,18 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 
 ---
 
-## 5. Network Flow
-
-```
-Guest เปิด Browser
-       │
-       ▼
-iptables PREROUTING (NAT)
-  → HTTP port 80 ถูก DNAT ไปที่ Portal IP:PORT
-       │
-       ▼
-Portal แสดงหน้า Login
-       │
-       ▼ (หลังล็อกอินสำเร็จ)
-iptables FORWARD
-  → เพิ่ม rule: -I FORWARD -s {guest_ip} -j ACCEPT
-       │
-       ▼
-tc HTB Class
-  → สร้าง class 1:{id} rate {bandwidth}kbit
-  → สร้าง u32 filter match dst {guest_ip}/32
-       │
-       ▼
-Guest ใช้อินเทอร์เน็ตได้ (ผ่าน FORWARD chain)
-       │
-       ▼ (เมื่อหมดอายุหรือ checkout)
-iptables -D FORWARD -s {guest_ip} -j ACCEPT
-tc class del + filter del
-Session.status = expired
-```
-
----
-
-## 6. Scheduler Jobs
+## 5. Scheduler Jobs
 
 | Job | ความถี่ | รายละเอียด |
 |-----|---------|-----------|
 | `_expire_job` | ทุก 60 วินาที | ตรวจ session ที่หมดอายุ → ลบ rules + update status |
+| `_bytes_job` | ทุก 60 วินาที | อัปเดต bytes_up/bytes_down + enforce data voucher limit |
 | `_poll_checkouts_job` | ทุก 300 วินาที | Sync checkout จาก PMS (Cloudbeds, FIAS, Custom) |
-
-**Adapter ที่ skip การ poll:**
-- OperaCloudAdapter → ใช้ Webhook
-- MewsAdapter → ใช้ Webhook
-- StandaloneAdapter → ไม่มี external PMS
-
-**Error handling:**
-- ถ้า poll ล้มเหลว → ไม่อัปเดต `last_sync_at` → poll รอบหน้าจะครอบคลุม window เดิม
+| `_analytics_snapshot_job` | ทุก 3600 วินาที | บันทึก usage snapshot สำหรับ analytics |
 
 ---
 
-## 7. Environment Variables
+## 6. Environment Variables
 
 | ตัวแปร | จำเป็น | Default | รายละเอียด |
 |--------|--------|---------|-----------|
@@ -397,12 +467,10 @@ Session.status = expired
 
 ---
 
-## 8. ข้อจำกัดปัจจุบัน
+## 7. ข้อจำกัดปัจจุบัน
 
 | รายการ | สถานะ |
 |--------|-------|
-| Upload bandwidth shaping | ⚠️ ยังไม่ implement (parameter รับแต่ไม่ทำงาน) |
-| Admin JWT authentication | ⚠️ โครงสร้างพร้อม แต่ middleware ยังไม่ enforce |
-| Data-based voucher enforcement | ⚠️ บันทึก bytes แต่ยังไม่ตัด session เมื่อเกิน |
 | Multi-server deployment | ⚠️ Design สำหรับ single-server hotel |
 | IPv6 support | ⚠️ iptables rules ใช้ IPv4 เท่านั้น |
+| Data-based voucher realtime enforcement | ⚠️ ตรวจทุก 60 วินาที (ไม่ใช่ realtime) |
