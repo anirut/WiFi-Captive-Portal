@@ -45,7 +45,7 @@ async def admin_client():
 
 @pytest.mark.asyncio
 async def test_list_sessions_returns_empty(admin_client):
-    response = await admin_client.get("/admin/sessions")
+    response = await admin_client.get("/admin/api/sessions")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
@@ -55,3 +55,19 @@ async def test_kick_nonexistent_session_returns_404(admin_client):
     fake_id = str(uuid.uuid4())
     response = await admin_client.delete(f"/admin/sessions/{fake_id}")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_sessions_rows_fragment_returns_html(client):
+    from app.core.auth import create_access_token
+    from app.main import app
+    from unittest.mock import AsyncMock
+    app.state.redis.exists = AsyncMock(return_value=False)
+    token = create_access_token({"sub": "admin", "role": "superadmin"})
+    resp = await client.get(
+        "/admin/sessions/rows",
+        cookies={"admin_token": token},
+        headers={"Accept": "text/html"},
+    )
+    assert resp.status_code == 200
+    assert b"session-tbody" in resp.content or b"No active sessions" in resp.content

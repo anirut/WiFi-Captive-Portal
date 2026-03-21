@@ -1,0 +1,26 @@
+<tbody id="session-tbody"
+       hx-get="/admin/sessions/rows"
+       hx-trigger="every 30s"
+       hx-target="#session-tbody"
+       hx-swap="outerHTML">
+  {% for s in sessions %}
+  <tr id="session-{{ s.id }}" class="border-b border-white/5 hover:bg-white/5">
+    <td class="py-2">{{ s.ip_address }}</td>
+    <td class="py-2">{{ s.guest_id or s.voucher_id or '-' }}</td>
+    <td class="py-2">{{ s.connected_at.strftime('%H:%M') if s.connected_at else '-' }}</td>
+    <td class="py-2">{{ s.expires_at.strftime('%Y-%m-%d %H:%M') if s.expires_at else '-' }}</td>
+    <td class="py-2">{{ "%.1f MB" % (s.bytes_down / 1048576) }}</td>
+    <td class="py-2">
+      <button hx-delete="/admin/sessions/{{ s.id }}"
+              hx-confirm="Kick this session?"
+              hx-target="#session-{{ s.id }}"
+              hx-swap="outerHTML swap:1s"
+              class="px-2 py-1 text-xs bg-red-500/20 text-red-300 rounded hover:bg-red-500/40">
+        Kick
+      </button>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="py-4 text-center text-slate-500">No active sessions</td></tr>
+  {% endfor %}
+</tbody>

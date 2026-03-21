@@ -102,7 +102,24 @@ async def admin_logout(request: Request, payload: dict = Depends(get_current_adm
     return response
 
 
-@router.get("/sessions")
+@router.get("/sessions/rows", response_class=HTMLResponse, include_in_schema=False)
+async def sessions_rows_fragment(request: Request, payload: dict = Depends(get_current_admin),
+                                  db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Session).where(Session.status == SessionStatus.active))
+    sessions = result.scalars().all()
+    return _templates.TemplateResponse("sessions_rows.html",
+        {"request": request, "current_user": payload, "sessions": sessions})
+
+@router.get("/sessions", response_class=HTMLResponse, include_in_schema=False)
+async def sessions_page(request: Request, payload: dict = Depends(get_current_admin),
+                         db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Session).where(Session.status == SessionStatus.active))
+    sessions = result.scalars().all()
+    flash = request.session.pop("flash", None)
+    return _templates.TemplateResponse("sessions.html",
+        {"request": request, "current_user": payload, "sessions": sessions, "flash": flash})
+
+@router.get("/api/sessions")
 async def list_sessions(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_admin),
