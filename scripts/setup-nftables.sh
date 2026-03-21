@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # setup-nftables.sh - Initialize nftables + tc + flowtables for captive portal
 # Usage: sudo ./setup-nftables.sh [OPTIONS]
@@ -10,6 +10,13 @@
 #   --wifi IF        WiFi interface (default: eth0 or $WIFI_INTERFACE)
 #   --wan IF         WAN interface (default: eth1 or $WAN_INTERFACE)
 # =============================================================================
+
+# Root privilege check
+if [[ $EUID -ne 0 ]]; then
+    echo "Error: This script must be run as root (use sudo)" >&2
+    exit 1
+fi
+
 set -e
 
 # Parse arguments
@@ -30,6 +37,16 @@ PORTAL_IP="${PORTAL_IP:-${PORTAL_IP:-192.168.1.1}}"
 PORTAL_PORT="${PORTAL_PORT:-${PORTAL_PORT:-8080}}"
 WIFI_IF="${WIFI_IF:-${WIFI_INTERFACE:-eth0}}"
 WAN_IF="${WAN_IF:-${WAN_INTERFACE:-eth1}}"
+
+# Validate interfaces exist
+if [[ ! -d "/sys/class/net/$WIFI_IF" ]]; then
+    echo "Error: WiFi interface '$WIFI_IF' not found" >&2
+    exit 1
+fi
+if [[ ! -d "/sys/class/net/$WAN_IF" ]]; then
+    echo "Error: WAN interface '$WAN_IF' not found" >&2
+    exit 1
+fi
 
 echo "Setting up nftables captive portal..."
 echo "  DNS upstream: $DNS_IP"
@@ -97,6 +114,7 @@ ip link set ifb0 up 2>/dev/null || true
 # WAN egress (download shaping)
 tc qdisc del dev $WAN_IF root 2>/dev/null || true
 tc qdisc add dev $WAN_IF root handle 1: htb default 999
+tc class add dev $WAN_IF parent 1: classid 1:999 htb rate 1000mbit ceil 1000mbit
 
 # WiFi ingress -> IFB (upload shaping)
 tc qdisc del dev $WIFI_IF ingress 2>/dev/null || true
@@ -106,6 +124,7 @@ tc filter add dev $WIFI_IF parent ffff: protocol ip u32 \
 
 tc qdisc del dev ifb0 root 2>/dev/null || true
 tc qdisc add dev ifb0 root handle 1: htb default 999
+tc class add dev ifb0 parent 1: classid 1:999 htb rate 1000mbit ceil 1000mbit
 
 echo "  ✓ tc HTB configured"
 
@@ -116,6 +135,13 @@ if nft list table inet captive_portal > /dev/null 2>&1; then
     echo "  ✓ nftables table verified"
 else
     echo "  ✗ nftables table verification failed"
+    exit 1
+fi
+
+if tc qdisc show dev $WAN_IF | grep -q "htb"; then
+    echo "  ✓ tc HTB on WAN verified"
+else
+    echo "  ✗ tc HTB verification failed"
     exit 1
 fi
 
