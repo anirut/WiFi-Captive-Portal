@@ -13,13 +13,13 @@ from sqlalchemy import select, func, extract, case
 from datetime import timedelta
 from fastapi import Query
 from app.core.database import get_db
-from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType, Policy, Room, UsageSnapshot, BrandConfig, LanguageType
+from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType, Policy, Room, UsageSnapshot, BrandConfig, LanguageType, DhcpConfig, DnsModeType
 from app.core.encryption import encrypt_config, decrypt_config
 from app.core.auth import get_current_user, get_current_admin, create_access_token, decode_access_token, require_superadmin
 from app.core.config import settings
 from app.network.session_manager import SessionManager
 from app.pms.factory import load_adapter, ADAPTER_MAP
-from app.admin.schemas import PMSConfigResponse, PMSConfigUpdate, PMSTestResult, VoucherCreate, VoucherResponse, BatchVoucherCreate
+from app.admin.schemas import PMSConfigResponse, PMSConfigUpdate, PMSTestResult, VoucherCreate, VoucherResponse, BatchVoucherCreate, DhcpConfigUpdate, DhcpConfigResponse
 from fastapi.responses import Response as _Response
 from app.voucher.pdf import generate_voucher_pdf as _gen_pdf
 from app.voucher.generator import generate_code
@@ -681,6 +681,95 @@ async def brand_page(request: Request, payload: dict = Depends(require_superadmi
     flash = request.session.pop("flash", None)
     return _templates.TemplateResponse("brand.html", {
         "request": request, "current_user": payload, "brand": brand, "flash": flash,
+    })
+
+
+# ── DHCP / dnsmasq ────────────────────────────────────────────────────────────
+from app.network import dnsmasq as _dnsmasq
+
+
+def _dhcp_to_response(d: DhcpConfig) -> dict:
+    return {
+        "id": str(d.id),
+        "enabled": d.enabled,
+        "interface": d.interface,
+        "gateway_ip": d.gateway_ip,
+        "subnet": d.subnet,
+        "dhcp_range_start": d.dhcp_range_start,
+        "dhcp_range_end": d.dhcp_range_end,
+        "lease_time": d.lease_time,
+        "dns_upstream_1": d.dns_upstream_1,
+        "dns_upstream_2": d.dns_upstream_2,
+        "dns_mode": d.dns_mode.value if hasattr(d.dns_mode, "value") else d.dns_mode,
+        "log_queries": d.log_queries,
+        "updated_at": d.updated_at.isoformat(),
+    }
+
+
+@router.get("/api/dhcp")
+async def get_dhcp_config(db: AsyncSession = Depends(get_db),
+                           _: dict = Depends(require_superadmin)):
+    result = await db.execute(select(DhcpConfig))
+    d = result.scalar_one_or_none()
+    if not d:
+        raise HTTPException(404, {"error": "dhcp_config_not_seeded"})
+    return _dhcp_to_response(d)
+
+
+@router.put("/api/dhcp")
+async def update_dhcp_config(body: DhcpConfigUpdate,
+                              db: AsyncSession = Depends(get_db),
+                              _: dict = Depends(require_superadmin)):
+    result = await db.execute(select(DhcpConfig))
+    d = result.scalar_one_or_none()
+    if not d:
+        raise HTTPException(404, {"error": "dhcp_config_not_seeded"})
+    for field, value in body.dict(exclude_none=True).items():
+        if field == "dns_mode":
+            try:
+                value = DnsModeType(value)
+            except ValueError:
+                raise HTTPException(422, {"error": "invalid_dns_mode", "allowed": ["redirect", "forward"]})
+        setattr(d, field, value)
+    d.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(d)
+    reloaded = False
+    if d.enabled:
+        _dnsmasq.write_config(d)
+        reloaded = _dnsmasq.reload_dnsmasq()
+    else:
+        _dnsmasq.write_config(d)  # stops dnsmasq when enabled=False
+    return {**_dhcp_to_response(d), "reloaded": reloaded}
+
+
+@router.get("/api/dhcp/status")
+async def dhcp_status(_: dict = Depends(require_superadmin)):
+    return _dnsmasq.get_status()
+
+
+@router.get("/api/dhcp/leases")
+async def dhcp_leases(_: dict = Depends(require_superadmin)):
+    return _dnsmasq.get_leases()
+
+
+@router.post("/api/dhcp/reload")
+async def dhcp_reload(_: dict = Depends(require_superadmin)):
+    reloaded = _dnsmasq.reload_dnsmasq()
+    return {"reloaded": reloaded}
+
+
+@router.get("/dhcp", response_class=HTMLResponse, include_in_schema=False)
+async def dhcp_page(request: Request, payload: dict = Depends(require_superadmin),
+                    db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(DhcpConfig))
+    d = result.scalar_one_or_none()
+    config = _dhcp_to_response(d) if d else None
+    status = _dnsmasq.get_status()
+    flash = request.session.pop("flash", None)
+    return _templates.TemplateResponse("dhcp.html", {
+        "request": request, "current_user": payload,
+        "config": config, "status": status, "flash": flash,
     })
 
 

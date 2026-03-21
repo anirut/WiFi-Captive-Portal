@@ -1,3 +1,4 @@
+from typing import Literal
 import uuid
 from datetime import datetime
 from pydantic import BaseModel, Field
@@ -54,3 +55,33 @@ class VoucherResponse(BaseModel):
     used_count: int
     expires_at: datetime | None
     created_by: uuid.UUID
+
+
+class DhcpConfigUpdate(BaseModel):
+    enabled: bool | None = None
+    interface: str | None = None
+    gateway_ip: str | None = None
+    subnet: str | None = None
+    dhcp_range_start: str | None = None
+    dhcp_range_end: str | None = None
+    lease_time: Literal["30m", "1h", "4h", "8h", "12h", "24h"] | None = None
+    dns_upstream_1: str | None = None
+    dns_upstream_2: str | None = None
+    dns_mode: str | None = None
+    log_queries: bool | None = None
+
+
+class DhcpConfigResponse(BaseModel):
+    id: str
+    enabled: bool
+    interface: str
+    gateway_ip: str
+    subnet: str
+    dhcp_range_start: str
+    dhcp_range_end: str
+    lease_time: str
+    dns_upstream_1: str
+    dns_upstream_2: str
+    dns_mode: str
+    log_queries: bool
+    updated_at: str
