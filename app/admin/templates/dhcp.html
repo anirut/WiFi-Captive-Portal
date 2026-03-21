@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% block title %}DHCP / DNS{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-semibold text-white mb-6">DHCP / DNS Settings</h2>
+
+{% if flash %}
+<div class="mb-4 p-3 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 text-sm">
+  {{ flash }}
+</div>
+{% endif %}
+
+<div x-data="dhcpPanel()" x-init="init()">
+
+  <!-- Service Status Card -->
+  <div class="glass rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-white">Service Status</h3>
+      <div class="flex gap-2">
+        <button @click="reloadService()" :disabled="reloading"
+                class="px-4 py-1.5 rounded text-white text-sm font-medium disabled:opacity-50"
+                style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+          <span x-show="!reloading">Reload</span>
+          <span x-show="reloading">Reloading...</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div class="bg-white/5 rounded-lg p-4">
+        <div class="text-slate-400 text-sm mb-1">Status</div>
+        <div class="flex items-center gap-2">
+          <span x-show="status.running" class="w-3 h-3 rounded-full bg-green-500"></span>
+          <span x-show="!status.running" class="w-3 h-3 rounded-full bg-red-500"></span>
+          <span x-text="status.running ? 'Running' : 'Stopped'" class="text-white font-medium"></span>
+        </div>
+      </div>
+      <div class="bg-white/5 rounded-lg p-4">
+        <div class="text-slate-400 text-sm mb-1">Active Leases</div>
+        <div x-text="status.lease_count" class="text-white font-medium text-xl"></div>
+      </div>
+      <div class="bg-white/5 rounded-lg p-4">
+        <div class="text-slate-400 text-sm mb-1">Config File</div>
+        <div class="flex items-center gap-2">
+          <span x-show="status.config_file_exists" class="text-green-400 text-sm">Present</span>
+          <span x-show="!status.config_file_exists" class="text-red-400 text-sm">Missing</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Configuration Form -->
+  <div class="glass rounded-xl p-6 mb-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Configuration</h3>
+
+    <form @submit.prevent="saveConfig" class="space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <!-- Enabled -->
+        <div class="flex items-center gap-3">
+          <input type="checkbox" id="enabled" x-model="config.enabled"
+                 class="w-5 h-5 rounded bg-white/5 border-white/10"/>
+          <label for="enabled" class="text-slate-300 text-sm">Enable DHCP/DNS Service</label>
+        </div>
+
+        <!-- Log Queries -->
+        <div class="flex items-center gap-3">
+          <input type="checkbox" id="log_queries" x-model="config.log_queries"
+                 class="w-5 h-5 rounded bg-white/5 border-white/10"/>
+          <label for="log_queries" class="text-slate-300 text-sm">Log DNS Queries</label>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4">
+        <!-- Interface -->
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Interface</label>
+          <input type="text" x-model="config.interface" placeholder="wlan0"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+
+        <!-- Gateway IP -->
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Gateway IP</label>
+          <input type="text" x-model="config.gateway_ip" placeholder="192.168.0.1"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+
+        <!-- Subnet -->
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Subnet (CIDR)</label>
+          <input type="text" x-model="config.subnet" placeholder="192.168.0.0/22"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+
+        <!-- DHCP Range Start -->
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">DHCP Range Start</label>
+          <input type="text" x-model="config.dhcp_range_start" placeholder="192.168.0.10"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+
+        <!-- DHCP Range End -->
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">DHCP Range End</label>
+          <input type="text" x-model="config.dhcp_range_end" placeholder="192.168.3.250"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+
+        <!-- Lease Time -->
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Lease Time</label>
+          <input type="text" x-model="config.lease_time" placeholder="8h"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+
+        <!-- DNS Upstream 1 -->
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">DNS Upstream 1</label>
+          <input type="text" x-model="config.dns_upstream_1" placeholder="8.8.8.8"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+
+        <!-- DNS Upstream 2 -->
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">DNS Upstream 2</label>
+          <input type="text" x-model="config.dns_upstream_2" placeholder="8.8.4.4"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+
+        <!-- DNS Mode -->
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">DNS Mode</label>
+          <select x-model="config.dns_mode"
+                  class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white">
+            <option value="redirect">Redirect (all DNS to portal)</option>
+            <option value="forward">Forward (use upstream)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 pt-2">
+        <button type="submit" :disabled="saving"
+                class="px-6 py-2 rounded text-white font-medium disabled:opacity-50"
+                style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+          <span x-show="!saving">Save Configuration</span>
+          <span x-show="saving">Saving...</span>
+        </button>
+        <span x-show="saveMessage" x-text="saveMessage" class="text-sm"
+              :class="saveSuccess ? 'text-green-400' : 'text-red-400'"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Active DHCP Leases -->
+  <div class="glass rounded-xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-white">Active DHCP Leases</h3>
+      <div class="flex items-center gap-2">
+        <input type="text" x-model="leaseSearch" placeholder="Search..."
+               class="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-white w-48"/>
+        <button @click="loadLeases()" class="px-3 py-1.5 rounded text-slate-300 text-sm glass">
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm text-slate-300">
+        <thead>
+          <tr class="text-slate-500 border-b border-white/10">
+            <th class="pb-2 text-left">MAC Address</th>
+            <th class="pb-2 text-left">IP Address</th>
+            <th class="pb-2 text-left">Hostname</th>
+            <th class="pb-2 text-left">Expires</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="lease in filteredLeases" :key="lease.mac">
+            <tr class="border-b border-white/5 hover:bg-white/5">
+              <td class="py-2 font-mono" x-text="lease.mac"></td>
+              <td class="py-2 font-mono" x-text="lease.ip"></td>
+              <td class="py-2" x-text="lease.hostname || '-'"></td>
+              <td class="py-2 text-slate-400" x-text="formatExpiry(lease.expires_at)"></td>
+            </tr>
+          </template>
+          <tr x-show="filteredLeases.length === 0">
+            <td colspan="4" class="py-8 text-center text-slate-500">No active leases</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function dhcpPanel() {
+  return {
+    status: { running: false, lease_count: 0, config_file_exists: false },
+    config: {
+      enabled: true,
+      interface: 'wlan0',
+      gateway_ip: '192.168.0.1',
+      subnet: '192.168.0.0/22',
+      dhcp_range_start: '192.168.0.10',
+      dhcp_range_end: '192.168.3.250',
+      lease_time: '8h',
+      dns_upstream_1: '8.8.8.8',
+      dns_upstream_2: '8.8.4.4',
+      dns_mode: 'redirect',
+      log_queries: false,
+    },
+    leases: [],
+    leaseSearch: '',
+    saving: false,
+    saveMessage: '',
+    saveSuccess: false,
+    reloading: false,
+
+    init() {
+      this.loadStatus();
+      this.loadConfig();
+      this.loadLeases();
+      // Poll status and leases every 30 seconds
+      setInterval(() => {
+        this.loadStatus();
+        this.loadLeases();
+      }, 30000);
+    },
+
+    async loadStatus() {
+      try {
+        const resp = await fetch('/admin/api/dhcp/status');
+        if (resp.ok) {
+          this.status = await resp.json();
+        }
+      } catch (e) {
+        console.error('Failed to load status:', e);
+      }
+    },
+
+    async loadConfig() {
+      try {
+        const resp = await fetch('/admin/api/dhcp');
+        if (resp.ok) {
+          const data = await resp.json();
+          this.config = data;
+        }
+      } catch (e) {
+        console.error('Failed to load config:', e);
+      }
+    },
+
+    async loadLeases() {
+      try {
+        const resp = await fetch('/admin/api/dhcp/leases');
+        if (resp.ok) {
+          this.leases = await resp.json();
+        }
+      } catch (e) {
+        console.error('Failed to load leases:', e);
+      }
+    },
+
+    async saveConfig() {
+      this.saving = true;
+      this.saveMessage = '';
+      try {
+        const resp = await fetch('/admin/api/dhcp', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.config),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          this.saveSuccess = true;
+          this.saveMessage = 'Configuration saved';
+          this.config = data;
+          // Refresh status after save
+          setTimeout(() => this.loadStatus(), 500);
+        } else {
+          this.saveSuccess = false;
+          this.saveMessage = data.detail?.error || 'Save failed';
+        }
+      } catch (e) {
+        this.saveSuccess = false;
+        this.saveMessage = 'Save failed: ' + e.message;
+      }
+      this.saving = false;
+    },
+
+    async reloadService() {
+      this.reloading = true;
+      try {
+        const resp = await fetch('/admin/api/dhcp/reload', { method: 'POST' });
+        if (resp.ok) {
+          setTimeout(() => this.loadStatus(), 500);
+        }
+      } catch (e) {
+        console.error('Reload failed:', e);
+      }
+      this.reloading = false;
+    },
+
+    get filteredLeases() {
+      if (!this.leaseSearch) return this.leases;
+      const q = this.leaseSearch.toLowerCase();
+      return this.leases.filter(l =>
+        l.mac?.toLowerCase().includes(q) ||
+        l.ip?.toLowerCase().includes(q) ||
+        l.hostname?.toLowerCase().includes(q)
+      );
+    },
+
+    formatExpiry(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      return d.toLocaleString();
+    },
+  };
+}
+</script>
+{% endblock %}
