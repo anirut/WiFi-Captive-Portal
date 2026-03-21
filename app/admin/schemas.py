@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.core.models import PMSAdapterType, VoucherType
 
 
@@ -31,6 +31,16 @@ class VoucherCreate(BaseModel):
     max_devices: int = 1
     max_uses: int = 1
     expires_at: datetime | None = None
+
+
+class BatchVoucherCreate(BaseModel):
+    type: str  # "time" | "data"
+    duration_minutes: int | None = None
+    data_limit_mb: int | None = None
+    max_uses: int = 1
+    max_devices: int = 1
+    expires_at: datetime | None = None
+    count: int = Field(ge=1, le=100)
 
 
 class VoucherResponse(BaseModel):

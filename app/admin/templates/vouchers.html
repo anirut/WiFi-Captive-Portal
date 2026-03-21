@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Vouchers{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-semibold text-white mb-6">Vouchers</h2>
+<div class="grid grid-cols-2 gap-6 mb-8">
+  <!-- Create Single Voucher -->
+  <div class="glass rounded-xl p-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Create Voucher</h3>
+    <form hx-post="/admin/vouchers" hx-target="#voucher-result" class="space-y-3">
+      <div x-data="{vtype:'time'}">
+        <label class="block text-sm text-slate-400 mb-1">Type</label>
+        <select name="type" x-model="vtype" class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white">
+          <option value="time">Time-based</option>
+          <option value="data">Data-based</option>
+        </select>
+        <div x-show="vtype=='time'" class="mt-2">
+          <input name="duration_minutes" type="number" placeholder="Duration (minutes)" class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+        <div x-show="vtype=='data'" class="mt-2">
+          <input name="data_limit_mb" type="number" placeholder="Data limit (MB)" class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+      </div>
+      <input name="max_uses" type="number" value="1" placeholder="Max uses" class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+      <button type="submit" class="w-full py-2 rounded text-white font-medium" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Create</button>
+    </form>
+    <div id="voucher-result" class="mt-3 text-sm text-green-400"></div>
+  </div>
+  <!-- Batch Generate -->
+  <div class="glass rounded-xl p-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Batch Generate</h3>
+    <form hx-post="/admin/vouchers/batch" hx-target="#batch-result" class="space-y-3">
+      <input name="type" type="hidden" value="time"/>
+      <input name="duration_minutes" type="number" value="60" placeholder="Duration (min)" class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+      <input name="count" type="number" min="1" max="100" value="10" class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white" placeholder="Count (1-100)"/>
+      <button type="submit" class="w-full py-2 rounded text-white font-medium" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Generate Batch</button>
+    </form>
+    <div id="batch-result" class="mt-3 text-sm text-green-400"></div>
+  </div>
+</div>
+<!-- Voucher List -->
+<div class="glass rounded-xl p-6">
+  <h3 class="text-lg font-semibold text-white mb-4">Voucher List</h3>
+  <table class="w-full text-sm text-slate-300">
+    <thead><tr class="text-slate-500 border-b border-white/10">
+      <th class="pb-2 text-left">Code</th><th class="pb-2 text-left">Type</th>
+      <th class="pb-2 text-left">Uses</th><th class="pb-2 text-left">Expires</th>
+      <th class="pb-2 text-left">PDF</th>
+    </tr></thead>
+    <tbody>
+    {% for v in vouchers %}
+    <tr class="border-b border-white/5">
+      <td class="py-2 font-mono">{{ v.code }}</td>
+      <td class="py-2">{{ v.type.value }}</td>
+      <td class="py-2">{{ v.used_count }}/{{ v.max_uses }}</td>
+      <td class="py-2">{{ v.expires_at.strftime('%Y-%m-%d') if v.expires_at else '∞' }}</td>
+      <td class="py-2 space-x-2">
+        <a href="/admin/vouchers/{{ v.id }}/pdf?qr_mode=code" class="text-indigo-400 hover:underline text-xs">Code QR</a>
+        <a href="/admin/vouchers/{{ v.id }}/pdf?qr_mode=url" class="text-indigo-400 hover:underline text-xs">URL QR</a>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="py-4 text-center text-slate-500">No vouchers</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

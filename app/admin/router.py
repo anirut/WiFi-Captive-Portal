@@ -16,7 +16,9 @@ from app.core.auth import get_current_user, get_current_admin, create_access_tok
 from app.core.config import settings
 from app.network.session_manager import SessionManager
 from app.pms.factory import load_adapter, ADAPTER_MAP
-from app.admin.schemas import PMSConfigResponse, PMSConfigUpdate, PMSTestResult, VoucherCreate, VoucherResponse
+from app.admin.schemas import PMSConfigResponse, PMSConfigUpdate, PMSTestResult, VoucherCreate, VoucherResponse, BatchVoucherCreate
+from fastapi.responses import Response as _Response
+from app.voucher.pdf import generate_voucher_pdf as _gen_pdf
 from app.voucher.generator import generate_code
 
 router = APIRouter(prefix="/admin")
@@ -216,6 +218,35 @@ async def test_pms_config(
         return PMSTestResult(ok=False, latency_ms=round(latency, 1), error=str(e))
 
 
+@router.post("/vouchers/batch")
+async def create_batch_vouchers(
+    body: BatchVoucherCreate,
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_admin),
+):
+    """Create `count` vouchers with the same settings."""
+    result = await db.execute(select(AdminUser).where(AdminUser.username == payload["sub"]))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, {"error": "user_not_found"})
+    created = []
+    for _ in range(body.count):
+        v = Voucher(
+            code=generate_code(),
+            type=VoucherType(body.type),
+            duration_minutes=body.duration_minutes,
+            data_limit_mb=body.data_limit_mb,
+            max_uses=body.max_uses,
+            max_devices=body.max_devices,
+            expires_at=body.expires_at,
+            created_by=user.id,
+        )
+        db.add(v)
+        created.append(v)
+    await db.commit()
+    return [{"id": str(v.id), "code": v.code, "type": v.type.value} for v in created]
+
+
 @router.post("/vouchers", response_model=VoucherResponse, status_code=201)
 async def create_voucher(
     body: VoucherCreate,
@@ -260,7 +291,7 @@ async def create_voucher(
     )
 
 
-@router.get("/vouchers", response_model=list[VoucherResponse])
+@router.get("/api/vouchers", response_model=list[VoucherResponse])
 async def list_vouchers(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_admin),
@@ -282,6 +313,37 @@ async def list_vouchers(
         )
         for v in vouchers
     ]
+
+
+@router.get("/vouchers/{voucher_id}/pdf")
+async def download_voucher_pdf(
+    voucher_id: uuid.UUID,
+    qr_mode: str = "code",
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_admin),
+):
+    result = await db.execute(select(Voucher).where(Voucher.id == voucher_id))
+    v = result.scalar_one_or_none()
+    if not v:
+        raise HTTPException(404, {"error": "not_found"})
+    if qr_mode not in ("url", "code"):
+        raise HTTPException(422, {"error": "invalid_qr_mode"})
+    pdf = _gen_pdf([{"code": v.code, "type": v.type.value,
+                     "duration_minutes": v.duration_minutes, "data_limit_mb": v.data_limit_mb}],
+                   qr_mode=qr_mode)
+    return _Response(content=pdf, media_type="application/pdf",
+                     headers={"Content-Disposition": f'attachment; filename="voucher-{v.code}.pdf"'})
+
+
+@router.get("/vouchers", response_class=HTMLResponse, include_in_schema=False)
+async def vouchers_page(request: Request, payload: dict = Depends(get_current_admin),
+                         db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Voucher).order_by(Voucher.created_at.desc()).limit(100))
+    vouchers = result.scalars().all()
+    flash = request.session.pop("flash", None)
+    return _templates.TemplateResponse("vouchers.html", {
+        "request": request, "current_user": payload, "vouchers": vouchers, "flash": flash,
+    })
 
 
 @router.delete("/vouchers/{voucher_id}", status_code=204)
