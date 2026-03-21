@@ -395,6 +395,9 @@ info "Setting up tc HTB traffic shaping..."
 WAN_IF="$WAN_INTERFACE" \
     bash "$SCRIPT_DIR/setup-tc.sh"
 
+info "Setting up dnsmasq DHCP+DNS..."
+bash "$SCRIPT_DIR/setup-dnsmasq.sh"
+
 # Persist iptables rules across reboots
 info "Persisting iptables rules..."
 netfilter-persistent save 2>/dev/null || iptables-save > /etc/iptables/rules.v4
