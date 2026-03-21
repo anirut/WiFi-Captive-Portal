@@ -383,24 +383,20 @@ PYEOF
 success "Admin user '$ADMIN_USER' ready."
 
 # =============================================================================
-# SECTION 8: Network Rules (iptables + tc)
+# SECTION 8: Network Rules (nftables + tc)
 # =============================================================================
 step "CONFIGURING NETWORK RULES"
 
-info "Setting up iptables rules..."
-WIFI_IF="$WIFI_INTERFACE" PORTAL_IP="$PORTAL_IP" PORTAL_PORT="$PORTAL_PORT" \
-    bash "$SCRIPT_DIR/setup-iptables.sh"
-
-info "Setting up tc HTB traffic shaping..."
-WAN_IF="$WAN_INTERFACE" \
-    bash "$SCRIPT_DIR/setup-tc.sh"
+info "Setting up nftables + flowtables + tc..."
+bash "$SCRIPT_DIR/setup-nftables.sh" \
+    --wifi "$WIFI_INTERFACE" \
+    --wan "$WAN_INTERFACE" \
+    --portal-ip "$PORTAL_IP" \
+    --portal-port "$PORTAL_PORT" \
+    --dns-ip "${DNS_UPSTREAM_IP:-8.8.8.8}"
 
 info "Setting up dnsmasq DHCP+DNS..."
 bash "$SCRIPT_DIR/setup-dnsmasq.sh"
-
-# Persist iptables rules across reboots
-info "Persisting iptables rules..."
-netfilter-persistent save 2>/dev/null || iptables-save > /etc/iptables/rules.v4
 
 success "Network rules configured."
 
@@ -424,8 +420,7 @@ User=root
 Group=root
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$ENV_FILE
-ExecStartPre=$SCRIPT_DIR/setup-iptables.sh
-ExecStartPre=$SCRIPT_DIR/setup-tc.sh
+ExecStartPre=$SCRIPT_DIR/setup-nftables.sh
 ExecStart=$VENV_DIR/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORTAL_PORT --workers 1
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=on-failure
