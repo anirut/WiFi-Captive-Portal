@@ -8,9 +8,11 @@ from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, extract, case
+from datetime import timedelta
+from fastapi import Query
 from app.core.database import get_db
-from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType, Policy, Room
+from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType, Policy, Room, UsageSnapshot
 from app.core.encryption import encrypt_config, decrypt_config
 from app.core.auth import get_current_user, get_current_admin, create_access_token, decode_access_token, require_superadmin
 from app.core.config import settings
@@ -438,6 +440,89 @@ async def assign_room_policy(room_id: uuid.UUID, body: RoomPolicyAssign,
     r.policy_id = body.policy_id
     await db.commit()
     return {"id": str(r.id), "number": r.number, "policy_id": str(r.policy_id) if r.policy_id else None}
+
+
+# ── Analytics ─────────────────────────────────────────────────────────────────
+
+RANGE_INTERVALS = {"24h": 24, "7d": 168, "30d": 720}  # hours
+
+
+@router.get("/api/analytics/data")
+async def analytics_data(
+    range_param: str = Query("24h", alias="range"),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(require_superadmin),
+):
+    if range_param not in RANGE_INTERVALS:
+        return JSONResponse(status_code=400, content={"error": "invalid_range", "valid": list(RANGE_INTERVALS.keys())})
+    hours = RANGE_INTERVALS[range_param]
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+    snaps_result = await db.execute(
+        select(UsageSnapshot).where(UsageSnapshot.snapshot_at >= since).order_by(UsageSnapshot.snapshot_at)
+    )
+    snaps = snaps_result.scalars().all()
+    sessions_over_time = [{"timestamp": s.snapshot_at.isoformat(), "active_sessions": s.active_sessions} for s in snaps]
+    bandwidth_per_hour = [{"timestamp": s.snapshot_at.isoformat(), "bytes_up": s.total_bytes_up, "bytes_down": s.total_bytes_down} for s in snaps]
+
+    peak_result = await db.execute(
+        select(
+            extract("dow", UsageSnapshot.snapshot_at).label("dow"),
+            extract("hour", UsageSnapshot.snapshot_at).label("hour"),
+            func.sum(UsageSnapshot.active_sessions).label("count"),
+        ).where(UsageSnapshot.snapshot_at >= since)
+        .group_by("dow", "hour").order_by("dow", "hour")
+    )
+    peak_hours = [{"day_of_week": int(r.dow), "hour": int(r.hour), "count": int(r.count or 0)} for r in peak_result]
+
+    auth_result = await db.execute(
+        select(
+            func.count(case((Session.voucher_id.is_(None), 1))).label("room_auth"),
+            func.count(case((Session.voucher_id.isnot(None), 1))).label("voucher_auth"),
+        ).where(Session.connected_at >= since)
+    )
+    row = auth_result.one()
+    auth_breakdown = {"room_auth": row.room_auth or 0, "voucher_auth": row.voucher_auth or 0}
+
+    return {"range": range_param, "sessions_over_time": sessions_over_time,
+            "bandwidth_per_hour": bandwidth_per_hour, "peak_hours": peak_hours,
+            "auth_breakdown": auth_breakdown}
+
+
+@router.get("/analytics", response_class=HTMLResponse, include_in_schema=False)
+async def analytics_page(
+    request: Request,
+    payload: dict = Depends(require_superadmin),
+    db: AsyncSession = Depends(get_db),
+    range_param: str = Query("24h", alias="range"),
+):
+    if range_param not in RANGE_INTERVALS:
+        range_param = "24h"
+    hours = RANGE_INTERVALS[range_param]
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    snaps_result = await db.execute(
+        select(UsageSnapshot).where(UsageSnapshot.snapshot_at >= since).order_by(UsageSnapshot.snapshot_at)
+    )
+    snaps = snaps_result.scalars().all()
+    sessions_over_time = [{"timestamp": s.snapshot_at.isoformat(), "active_sessions": s.active_sessions} for s in snaps]
+    bandwidth_per_hour = [{"timestamp": s.snapshot_at.isoformat(), "bytes_up": s.total_bytes_up, "bytes_down": s.total_bytes_down} for s in snaps]
+    auth_result = await db.execute(
+        select(
+            func.count(case((Session.voucher_id.is_(None), 1))).label("room_auth"),
+            func.count(case((Session.voucher_id.isnot(None), 1))).label("voucher_auth"),
+        ).where(Session.connected_at >= since)
+    )
+    row = auth_result.one()
+    auth_breakdown = {"room_auth": row.room_auth or 0, "voucher_auth": row.voucher_auth or 0}
+    analytics_data_val = {
+        "range": range_param, "sessions_over_time": sessions_over_time,
+        "bandwidth_per_hour": bandwidth_per_hour, "auth_breakdown": auth_breakdown,
+    }
+    flash = request.session.pop("flash", None)
+    return _templates.TemplateResponse("analytics.html", {
+        "request": request, "current_user": payload,
+        "analytics_data": analytics_data_val, "range": range_param, "flash": flash,
+    })
 
 
 # ── HTML pages ────────────────────────────────────────────────────────────────

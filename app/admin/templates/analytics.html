@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-semibold text-white mb-6">Analytics</h2>
+<div class="flex gap-2 mb-6">
+  {% for r in ['24h','7d','30d'] %}
+  <a href="/admin/analytics?range={{ r }}"
+     class="px-4 py-2 rounded-lg text-sm {% if range == r %}text-white{% else %}glass text-slate-300 hover:bg-white/10{% endif %}"
+     {% if range == r %}style="background:linear-gradient(135deg,#6366f1,#8b5cf6)"{% endif %}>
+    {{ r }}
+  </a>
+  {% endfor %}
+</div>
+<div class="grid grid-cols-2 gap-6">
+  <div class="glass rounded-xl p-6"><canvas id="sessionsChart"></canvas></div>
+  <div class="glass rounded-xl p-6"><canvas id="bandwidthChart"></canvas></div>
+  <div class="glass rounded-xl p-6"><canvas id="authChart"></canvas></div>
+</div>
+<script>
+const data = {{ analytics_data | tojson }};
+new Chart(document.getElementById('sessionsChart'), {
+  type: 'line',
+  data: {
+    labels: data.sessions_over_time.map(d => d.timestamp.substr(11,5)),
+    datasets: [{label: 'Active Sessions', data: data.sessions_over_time.map(d => d.active_sessions),
+                borderColor: '#6366f1', fill: true, tension: 0.3}]
+  }, options: {plugins:{legend:{labels:{color:'#e2e8f0'}}}, scales:{x:{ticks:{color:'#94a3b8'}}, y:{ticks:{color:'#94a3b8'}}}}
+});
+new Chart(document.getElementById('bandwidthChart'), {
+  type: 'bar',
+  data: {
+    labels: data.bandwidth_per_hour.map(d => d.timestamp.substr(11,5)),
+    datasets: [
+      {label: 'Down (MB)', data: data.bandwidth_per_hour.map(d => Math.round(d.bytes_down/1048576)), backgroundColor: '#6366f1'},
+      {label: 'Up (MB)', data: data.bandwidth_per_hour.map(d => Math.round(d.bytes_up/1048576)), backgroundColor: '#8b5cf6'}
+    ]
+  }, options: {plugins:{legend:{labels:{color:'#e2e8f0'}}}, scales:{x:{ticks:{color:'#94a3b8'}}, y:{ticks:{color:'#94a3b8'}}}}
+});
+new Chart(document.getElementById('authChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Room Auth', 'Voucher Auth'],
+    datasets: [{data: [data.auth_breakdown.room_auth, data.auth_breakdown.voucher_auth],
+                backgroundColor: ['#6366f1', '#8b5cf6']}]
+  }, options: {plugins:{legend:{labels:{color:'#e2e8f0'}}}}
+});
+</script>
+{% endblock %}

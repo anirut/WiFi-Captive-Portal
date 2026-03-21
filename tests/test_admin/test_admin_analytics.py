@@ -83,3 +83,56 @@ async def test_analytics_snapshot_job_inserts_row():
     assert mock_db.add.called
     snapshot = mock_db.add.call_args[0][0]
     assert snapshot.active_sessions == 5
+
+
+@pytest.mark.asyncio
+async def test_analytics_invalid_range_returns_400(client):
+    from app.core.auth import create_access_token
+    from app.main import app
+    app.state.redis.exists = AsyncMock(return_value=False)
+    token = create_access_token({"sub": "admin", "role": "superadmin"})
+    resp = await client.get(
+        "/admin/api/analytics/data?range=1y",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+    assert "invalid_range" in resp.json()["error"]
+
+@pytest.mark.asyncio
+async def test_analytics_valid_range_returns_schema(client):
+    from app.core.auth import create_access_token
+    from app.main import app
+    from app.core.database import get_db
+    app.state.redis.exists = AsyncMock(return_value=False)
+    token = create_access_token({"sub": "admin", "role": "superadmin"})
+
+    mock_db = AsyncMock()
+    snaps_result = MagicMock()
+    snaps_result.scalars.return_value.all.return_value = []
+    peak_result = MagicMock()
+    peak_result.__iter__ = MagicMock(return_value=iter([]))
+    auth_result = MagicMock()
+    auth_row = MagicMock()
+    auth_row.room_auth = 5
+    auth_row.voucher_auth = 2
+    auth_result.one.return_value = auth_row
+    mock_db.execute = AsyncMock(side_effect=[snaps_result, peak_result, auth_result])
+
+    async def override_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        resp = await client.get(
+            "/admin/api/analytics/data?range=24h",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "sessions_over_time" in data
+        assert "bandwidth_per_hour" in data
+        assert "peak_hours" in data
+        assert "auth_breakdown" in data
+        assert data["auth_breakdown"]["room_auth"] >= 0
+    finally:
+        app.dependency_overrides.pop(get_db, None)
