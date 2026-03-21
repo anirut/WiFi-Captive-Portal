@@ -1,7 +1,8 @@
 import uuid
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import String, Integer, Boolean, BigInteger, ForeignKey, Enum, DateTime, LargeBinary
+from typing import Optional
+from sqlalchemy import String, Integer, Boolean, BigInteger, Text, ForeignKey, Enum, DateTime, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID, INET, MACADDR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
@@ -31,6 +32,10 @@ class AdminRole(enum.Enum):
     superadmin = "superadmin"
     staff = "staff"
 
+class LanguageType(enum.Enum):
+    th = "th"
+    en = "en"
+
 class Guest(Base):
     __tablename__ = "guests"
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -55,6 +60,7 @@ class Session(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     bytes_up: Mapped[int] = mapped_column(BigInteger, default=0)
     bytes_down: Mapped[int] = mapped_column(BigInteger, default=0)
+    bandwidth_up_kbps: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     status: Mapped[SessionStatus] = mapped_column(Enum(SessionStatus), default=SessionStatus.active)
     guest: Mapped["Guest | None"] = relationship(back_populates="sessions")
     voucher: Mapped["Voucher | None"] = relationship(back_populates="sessions")
@@ -106,3 +112,25 @@ class AdminUser(Base):
     password_hash: Mapped[str] = mapped_column(String(200))
     role: Mapped[AdminRole] = mapped_column(Enum(AdminRole), default=AdminRole.staff)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class UsageSnapshot(Base):
+    __tablename__ = "usage_snapshots"
+    id: Mapped[uuid.UUID] = uuid_pk()
+    snapshot_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    active_sessions: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    total_bytes_up: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    total_bytes_down: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    voucher_uses: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
+class BrandConfig(Base):
+    __tablename__ = "brand_config"
+    id: Mapped[uuid.UUID] = uuid_pk()
+    hotel_name: Mapped[str] = mapped_column(String(200), nullable=False, default="Hotel WiFi", server_default="Hotel WiFi")
+    logo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    primary_color: Mapped[str] = mapped_column(String(7), nullable=False, default="#3B82F6", server_default="'#3B82F6'")
+    tc_text_th: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tc_text_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    language: Mapped[LanguageType] = mapped_column(Enum(LanguageType, name="languagetype"), nullable=False, default=LanguageType.th)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default="now()")
