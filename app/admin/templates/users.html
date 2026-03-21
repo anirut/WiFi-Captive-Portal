@@ -63,7 +63,7 @@
             const body = Object.fromEntries(fd.entries());
             fetch('/admin/api/users', {
               method: 'POST',
-              headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (document.cookie.match(/admin_token=([^;]+)/) || [])[1] || ''},
+              headers: {'Content-Type': 'application/json'},
               body: JSON.stringify(body)
             }).then(r => r.json().then(d => ({ status: r.status, data: d }))).then(({ status, data }) => {
               loading = false;

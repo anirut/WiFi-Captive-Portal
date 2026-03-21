@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 import os as _os
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, extract, case
 from datetime import timedelta
@@ -530,7 +530,7 @@ async def analytics_page(
 
 class AdminUserCreate(BaseModel):
     username: str
-    password: str
+    password: str = Field(min_length=8)
     role: str = "staff"  # "staff" | "superadmin"
 
 
@@ -546,10 +546,20 @@ async def list_admin_users(db: AsyncSession = Depends(get_db), _: dict = Depends
 async def create_admin_user(body: AdminUserCreate, db: AsyncSession = Depends(get_db),
                              _: dict = Depends(require_superadmin)):
     from app.core.models import AdminRole
+    try:
+        role = AdminRole(body.role)
+    except ValueError:
+        raise HTTPException(422, {"error": "invalid_role", "allowed": ["staff", "superadmin"]})
     pw_hash = _bcrypt.hashpw(body.password.encode(), _bcrypt.gensalt()).decode()
-    user = AdminUser(username=body.username, password_hash=pw_hash, role=AdminRole(body.role))
+    user = AdminUser(username=body.username, password_hash=pw_hash, role=role)
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+            raise HTTPException(409, {"error": "username_already_exists"})
+        raise
     await db.refresh(user)
     return {"id": str(user.id), "username": user.username, "role": user.role.value}
 
