@@ -127,7 +127,7 @@ class UsageSnapshot(Base):
 class BrandConfig(Base):
     __tablename__ = "brand_config"
     id: Mapped[uuid.UUID] = uuid_pk()
-    hotel_name: Mapped[str] = mapped_column(String(200), nullable=False, default="Hotel WiFi", server_default="Hotel WiFi")
+    hotel_name: Mapped[str] = mapped_column(String(200), nullable=False, default="Hotel WiFi", server_default="'Hotel WiFi'")
     logo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     primary_color: Mapped[str] = mapped_column(String(7), nullable=False, default="#3B82F6", server_default="'#3B82F6'")
     tc_text_th: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
