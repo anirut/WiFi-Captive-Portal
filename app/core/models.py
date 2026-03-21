@@ -36,6 +36,11 @@ class LanguageType(enum.Enum):
     th = "th"
     en = "en"
 
+
+class DnsModeType(str, enum.Enum):
+    redirect = "redirect"
+    forward = "forward"
+
 class Guest(Base):
     __tablename__ = "guests"
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -134,3 +139,25 @@ class BrandConfig(Base):
     tc_text_en: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     language: Mapped[LanguageType] = mapped_column(Enum(LanguageType, name="languagetype"), nullable=False, default=LanguageType.th)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default="now()")
+
+
+class DhcpConfig(Base):
+    __tablename__ = "dhcp_config"
+    id: Mapped[uuid.UUID] = uuid_pk()
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    interface: Mapped[str] = mapped_column(String(32), nullable=False, default="wlan0", server_default="'wlan0'")
+    gateway_ip: Mapped[str] = mapped_column(String(15), nullable=False, default="192.168.0.1", server_default="'192.168.0.1'")
+    subnet: Mapped[str] = mapped_column(String(18), nullable=False, default="192.168.0.0/22", server_default="'192.168.0.0/22'")
+    dhcp_range_start: Mapped[str] = mapped_column(String(15), nullable=False, default="192.168.0.10", server_default="'192.168.0.10'")
+    dhcp_range_end: Mapped[str] = mapped_column(String(15), nullable=False, default="192.168.3.250", server_default="'192.168.3.250'")
+    lease_time: Mapped[str] = mapped_column(String(8), nullable=False, default="8h", server_default="'8h'")
+    dns_upstream_1: Mapped[str] = mapped_column(String(45), nullable=False, default="8.8.8.8", server_default="'8.8.8.8'")
+    dns_upstream_2: Mapped[str] = mapped_column(String(45), nullable=False, default="8.8.4.4", server_default="'8.8.4.4'")
+    dns_mode: Mapped[DnsModeType] = mapped_column(
+        Enum(DnsModeType, name="dnsmodetype"), nullable=False, default=DnsModeType.redirect
+    )
+    log_queries: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc), server_default="now()"
+    )
