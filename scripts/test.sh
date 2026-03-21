@@ -106,7 +106,7 @@ section "System"
 run_check "python3 >= 3.12 available" bash -c \
     'python3 --version 2>/dev/null | python3 -c "import sys,re; v=input(); m=re.match(r\"Python (\d+)\.(\d+)\",v); sys.exit(0 if m and (int(m[1]),int(m[2])) >= (3,12) else 1)"'
 
-run_check "iptables available" bash -c 'command -v iptables'
+run_check "nft (nftables) available" bash -c 'command -v nft'
 run_check "tc (iproute2) available" bash -c 'command -v tc'
 run_check "psql client available" bash -c 'command -v psql'
 run_check "redis-cli available" bash -c 'command -v redis-cli'
@@ -184,15 +184,15 @@ run_check "Redis responds to PING" bash -c \
 section "Network Rules"
 # =============================================================================
 
-# iptables
-if command -v iptables &>/dev/null; then
-    run_check "iptables FORWARD rules present" bash -c \
-        "iptables -L FORWARD -n 2>/dev/null | grep -q '$WIFI_INTERFACE'"
+# nftables
+if command -v nft &>/dev/null; then
+    run_check "nftables table exists" bash -c \
+        "nft list table inet captive_portal 2>/dev/null | grep -q 'whitelist'"
 
-    run_check "iptables NAT PREROUTING redirect present" bash -c \
-        "iptables -t nat -L PREROUTING -n 2>/dev/null | grep -q '$PORTAL_PORT'"
+    run_check "nftables flowtable configured" bash -c \
+        "nft list table inet captive_portal 2>/dev/null | grep -q 'flowtable'"
 else
-    warn_result "iptables not available — skipping firewall checks"
+    fail "nftables not available — required for v2.0"
 fi
 
 # tc
