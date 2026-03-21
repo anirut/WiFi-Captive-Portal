@@ -3,7 +3,8 @@ import uuid
 import bcrypt as _bcrypt
 from datetime import datetime, timezone
 from urllib.parse import urlparse
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+import os as _os
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -12,7 +13,7 @@ from sqlalchemy import select, func, extract, case
 from datetime import timedelta
 from fastapi import Query
 from app.core.database import get_db
-from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType, Policy, Room, UsageSnapshot
+from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType, Policy, Room, UsageSnapshot, BrandConfig, LanguageType
 from app.core.encryption import encrypt_config, decrypt_config
 from app.core.auth import get_current_user, get_current_admin, create_access_token, decode_access_token, require_superadmin
 from app.core.config import settings
@@ -522,6 +523,95 @@ async def analytics_page(
     return _templates.TemplateResponse("analytics.html", {
         "request": request, "current_user": payload,
         "analytics_data": analytics_data_val, "range": range_param, "flash": flash,
+    })
+
+
+# ── Brand & Config ────────────────────────────────────────────────────────────
+
+ALLOWED_LOGO_MIME = {"image/jpeg", "image/png", "image/webp"}
+MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB
+LOGO_UPLOAD_DIR = "static/uploads/logo"
+
+
+class BrandUpdate(BaseModel):
+    hotel_name: str | None = None
+    primary_color: str | None = None
+    tc_text_th: str | None = None
+    tc_text_en: str | None = None
+    language: str | None = None
+
+
+@router.get("/api/brand")
+async def get_brand(db: AsyncSession = Depends(get_db), _: dict = Depends(require_superadmin)):
+    result = await db.execute(select(BrandConfig))
+    b = result.scalar_one_or_none()
+    if not b:
+        return {"hotel_name": "Hotel WiFi", "logo_url": None, "primary_color": "#3B82F6",
+                "tc_text_th": None, "tc_text_en": None, "language": "th"}
+    logo_url = f"/static/{b.logo_path}" if b.logo_path else None
+    return {"hotel_name": b.hotel_name, "logo_url": logo_url, "primary_color": b.primary_color,
+            "tc_text_th": b.tc_text_th, "tc_text_en": b.tc_text_en, "language": b.language.value}
+
+
+@router.put("/api/brand")
+async def update_brand(body: BrandUpdate, db: AsyncSession = Depends(get_db),
+                        _: dict = Depends(require_superadmin)):
+    result = await db.execute(select(BrandConfig))
+    b = result.scalar_one_or_none()
+    if not b:
+        raise HTTPException(404, {"error": "brand_config_not_seeded"})
+    for field, value in body.dict(exclude_none=True).items():
+        if field == "language":
+            value = LanguageType(value)
+        setattr(b, field, value)
+    b.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"hotel_name": b.hotel_name, "primary_color": b.primary_color, "language": b.language.value}
+
+
+@router.post("/brand/logo")
+async def upload_logo(file: UploadFile = File(...), db: AsyncSession = Depends(get_db),
+                       _: dict = Depends(require_superadmin)):
+    if file.content_type not in ALLOWED_LOGO_MIME:
+        raise HTTPException(422, {"error": "invalid_mime_type", "allowed": list(ALLOWED_LOGO_MIME)})
+    data = await file.read(MAX_LOGO_BYTES + 1)
+    if len(data) > MAX_LOGO_BYTES:
+        raise HTTPException(413, {"error": "file_too_large", "max_mb": 2})
+    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "jpg"
+    _os.makedirs(LOGO_UPLOAD_DIR, exist_ok=True)
+    for ext_check in ("jpg", "jpeg", "png", "webp"):
+        old = f"{LOGO_UPLOAD_DIR}/logo.{ext_check}"
+        try:
+            _os.remove(old)
+        except FileNotFoundError:
+            pass
+    logo_filename = f"logo.{ext}"
+    logo_full_path = f"{LOGO_UPLOAD_DIR}/{logo_filename}"
+    with open(logo_full_path, "wb") as fh:
+        fh.write(data)
+    relative_path = f"uploads/logo/{logo_filename}"
+    result = await db.execute(select(BrandConfig))
+    b = result.scalar_one_or_none()
+    if b:
+        b.logo_path = relative_path
+        b.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+    return {"logo_url": f"/static/{relative_path}"}
+
+
+@router.get("/brand", response_class=HTMLResponse, include_in_schema=False)
+async def brand_page(request: Request, payload: dict = Depends(require_superadmin),
+                     db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(BrandConfig))
+    b = result.scalar_one_or_none()
+    brand = None
+    if b:
+        brand = {"hotel_name": b.hotel_name, "logo_url": f"/static/{b.logo_path}" if b.logo_path else None,
+                 "primary_color": b.primary_color, "tc_text_th": b.tc_text_th,
+                 "tc_text_en": b.tc_text_en, "language": b.language.value}
+    flash = request.session.pop("flash", None)
+    return _templates.TemplateResponse("brand.html", {
+        "request": request, "current_user": payload, "brand": brand, "flash": flash,
     })
 
 

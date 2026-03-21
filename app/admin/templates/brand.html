@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Brand & Config{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-semibold text-white mb-6">Brand & Configuration</h2>
+<div class="grid grid-cols-2 gap-6">
+
+  <!-- Brand Settings -->
+  <div class="glass rounded-xl p-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Hotel Settings</h3>
+    <form hx-put="/admin/api/brand" hx-target="#brand-result" class="space-y-4">
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Hotel Name</label>
+        <input name="hotel_name" type="text" value="{{ brand.hotel_name if brand else 'Hotel WiFi' }}"
+               class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Primary Color</label>
+        <input name="primary_color" type="color" value="{{ brand.primary_color if brand else '#3B82F6' }}"
+               class="w-full h-10 bg-white/5 border border-white/10 rounded"/>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Language</label>
+        <select name="language" class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white">
+          <option value="th" {% if brand and brand.language == 'th' %}selected{% endif %}>Thai</option>
+          <option value="en" {% if brand and brand.language == 'en' %}selected{% endif %}>English</option>
+        </select>
+      </div>
+      <button type="submit" class="w-full py-2 rounded text-white font-medium" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Save Settings</button>
+    </form>
+    <div id="brand-result" class="mt-3 text-sm text-green-400"></div>
+  </div>
+
+  <!-- Logo Upload -->
+  <div class="glass rounded-xl p-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Logo Upload</h3>
+    {% if brand and brand.logo_url %}
+    <img src="{{ brand.logo_url }}" alt="Current Logo" class="w-32 h-32 object-contain mb-4 rounded"/>
+    {% endif %}
+    <form hx-post="/admin/brand/logo" hx-encoding="multipart/form-data" hx-target="#logo-result" class="space-y-3">
+      <input type="file" name="file" accept="image/jpeg,image/png,image/webp"
+             class="w-full text-slate-300 text-sm"/>
+      <p class="text-xs text-slate-500">Max 2MB — JPEG, PNG, WebP</p>
+      <button type="submit" class="w-full py-2 rounded text-white font-medium" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Upload Logo</button>
+    </form>
+    <div id="logo-result" class="mt-3 text-sm text-green-400"></div>
+  </div>
+
+  <!-- T&C Text -->
+  <div class="glass rounded-xl p-6 col-span-2" x-data="{tab:'th'}">
+    <h3 class="text-lg font-semibold text-white mb-4">Terms & Conditions</h3>
+    <div class="flex gap-2 mb-4">
+      <button @click="tab='th'" :class="tab=='th' ? 'text-white' : 'glass text-slate-300'" class="px-4 py-1 rounded text-sm" :style="tab=='th' ? 'background:linear-gradient(135deg,#6366f1,#8b5cf6)' : ''">Thai</button>
+      <button @click="tab='en'" :class="tab=='en' ? 'text-white' : 'glass text-slate-300'" class="px-4 py-1 rounded text-sm" :style="tab=='en' ? 'background:linear-gradient(135deg,#6366f1,#8b5cf6)' : ''">English</button>
+    </div>
+    <form hx-put="/admin/api/brand" hx-target="#tc-result" class="space-y-3">
+      <textarea x-show="tab=='th'" name="tc_text_th" rows="8"
+                class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm">{{ brand.tc_text_th if brand and brand.tc_text_th else '' }}</textarea>
+      <textarea x-show="tab=='en'" name="tc_text_en" rows="8"
+                class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm">{{ brand.tc_text_en if brand and brand.tc_text_en else '' }}</textarea>
+      <button type="submit" class="py-2 px-6 rounded text-white font-medium" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Save T&amp;C</button>
+    </form>
+    <div id="tc-result" class="mt-3 text-sm text-green-400"></div>
+  </div>
+
+</div>
+{% endblock %}
