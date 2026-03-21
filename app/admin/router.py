@@ -7,12 +7,13 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
-from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser
+from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType
 from app.core.encryption import encrypt_config, decrypt_config
 from app.core.auth import get_current_user, create_access_token
 from app.network.session_manager import SessionManager
 from app.pms.factory import load_adapter, ADAPTER_MAP
-from app.admin.schemas import PMSConfigResponse, PMSConfigUpdate, PMSTestResult
+from app.admin.schemas import PMSConfigResponse, PMSConfigUpdate, PMSTestResult, VoucherCreate, VoucherResponse
+from app.voucher.generator import generate_code
 
 router = APIRouter(prefix="/admin")
 session_manager = SessionManager()
@@ -111,6 +112,8 @@ async def update_pms_config(
         db.add(record)
     record.type = body.type
     record.config_encrypted = encrypt_config(body.config)
+    if body.webhook_secret is not None:
+        record.webhook_secret = body.webhook_secret
     await db.commit()
     await load_adapter(db)
     return {"ok": True}
@@ -135,3 +138,85 @@ async def test_pms_config(
     except Exception as e:
         latency = (time.monotonic() - start) * 1000
         return PMSTestResult(ok=False, latency_ms=round(latency, 1), error=str(e))
+
+
+@router.post("/vouchers", response_model=VoucherResponse, status_code=201)
+async def create_voucher(
+    body: VoucherCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    # Resolve admin user id from JWT sub (username)
+    result = await db.execute(select(AdminUser).where(AdminUser.username == current_user["sub"]))
+    admin = result.scalar_one_or_none()
+    if not admin:
+        raise HTTPException(status_code=401, detail={"error": "invalid_token"})
+    # Generate a unique code (retry once on collision)
+    code = generate_code()
+    existing = await db.execute(select(Voucher).where(Voucher.code == code))
+    if existing.scalar_one_or_none():
+        code = generate_code()
+    voucher = Voucher(
+        code=code,
+        type=body.type,
+        duration_minutes=body.duration_minutes,
+        data_limit_mb=body.data_limit_mb,
+        max_devices=body.max_devices,
+        max_uses=body.max_uses,
+        expires_at=body.expires_at,
+        used_count=0,
+        created_by=admin.id,
+    )
+    db.add(voucher)
+    await db.commit()
+    await db.refresh(voucher)
+    return VoucherResponse(
+        id=voucher.id,
+        code=voucher.code,
+        type=voucher.type,
+        duration_minutes=voucher.duration_minutes,
+        data_limit_mb=voucher.data_limit_mb,
+        max_devices=voucher.max_devices,
+        max_uses=voucher.max_uses,
+        used_count=voucher.used_count,
+        expires_at=voucher.expires_at,
+        created_by=voucher.created_by,
+    )
+
+
+@router.get("/vouchers", response_model=list[VoucherResponse])
+async def list_vouchers(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    result = await db.execute(select(Voucher))
+    vouchers = result.scalars().all()
+    return [
+        VoucherResponse(
+            id=v.id,
+            code=v.code,
+            type=v.type,
+            duration_minutes=v.duration_minutes,
+            data_limit_mb=v.data_limit_mb,
+            max_devices=v.max_devices,
+            max_uses=v.max_uses,
+            used_count=v.used_count,
+            expires_at=v.expires_at,
+            created_by=v.created_by,
+        )
+        for v in vouchers
+    ]
+
+
+@router.delete("/vouchers/{voucher_id}", status_code=204)
+async def delete_voucher(
+    voucher_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    result = await db.execute(select(Voucher).where(Voucher.id == voucher_id))
+    voucher = result.scalar_one_or_none()
+    if not voucher:
+        raise HTTPException(status_code=404, detail={"error": "not_found"})
+    await db.delete(voucher)
+    await db.commit()
