@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}PMS Settings{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-semibold text-white mb-6">PMS Settings</h2>
+
+{% if flash %}
+<div class="mb-4 p-3 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 text-sm">
+  {{ flash }}
+</div>
+{% endif %}
+
+<div x-data="{ editing: false }">
+
+  <!-- Current Configuration Card -->
+  <div class="glass rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-white">Current Configuration</h3>
+      <button @click="editing = true" x-show="!editing"
+              class="px-4 py-1.5 rounded text-white text-sm font-medium"
+              style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+        Edit
+      </button>
+    </div>
+
+    <div class="space-y-2">
+      <div class="flex items-center gap-3">
+        <span class="text-slate-400 text-sm w-32">Adapter Type</span>
+        {% if adapter_type %}
+        <span class="text-white font-mono text-sm px-2 py-0.5 bg-white/10 rounded">{{ adapter_type }}</span>
+        {% else %}
+        <span class="text-slate-500 text-sm italic">Not configured</span>
+        {% endif %}
+      </div>
+      {% for key, val in config.items() %}
+      <div class="flex items-center gap-3">
+        <span class="text-slate-400 text-sm w-32">{{ key }}</span>
+        <span class="text-white font-mono text-sm px-2 py-0.5 bg-white/10 rounded">{{ val }}</span>
+      </div>
+      {% endfor %}
+      {% if not adapter_type and not config %}
+      <p class="text-slate-500 text-sm italic">No PMS adapter configured. Click Edit to set one up.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Edit Form -->
+  <div x-show="editing" x-cloak class="glass rounded-xl p-6 mb-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Edit PMS Configuration</h3>
+    <form hx-put="/admin/pms" hx-target="#pms-response" hx-ext="json-enc"
+          class="space-y-4" x-data="{ pmsType: '{{ adapter_type or 'standalone' }}' }">
+
+      <div>
+        <label class="block text-sm text-slate-400 mb-1">Adapter Type</label>
+        <select name="type" x-model="pmsType"
+                class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white">
+          <option value="opera_cloud">Opera Cloud</option>
+          <option value="mews">Mews</option>
+          <option value="standalone">Standalone</option>
+        </select>
+      </div>
+
+      <div x-show="pmsType !== 'standalone'" class="space-y-3">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Base URL</label>
+          <input type="url" name="base_url" placeholder="https://api.example.com"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Client ID</label>
+          <input type="text" name="client_id" placeholder="Client ID"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Client Secret</label>
+          <input type="password" name="client_secret" placeholder="Client Secret"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Hotel ID</label>
+          <input type="text" name="hotel_id" placeholder="Hotel ID"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+      </div>
+
+      <div id="pms-response" class="text-sm text-green-400"></div>
+
+      <div class="flex gap-3 pt-2">
+        <button type="submit"
+                class="px-6 py-2 rounded text-white font-medium"
+                style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+          Save
+        </button>
+        <button type="button" @click="editing = false"
+                class="px-6 py-2 rounded text-slate-300 font-medium glass">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Test Connection -->
+  <div class="glass rounded-xl p-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Test Connection</h3>
+    <p class="text-slate-400 text-sm mb-4">
+      Verify that the current PMS adapter can connect and respond to a health check.
+    </p>
+    <button hx-post="/admin/pms/test" hx-target="#test-result"
+            hx-vals='{"type": "{{ adapter_type or 'standalone' }}", "config": {}}'
+            class="px-6 py-2 rounded text-white font-medium"
+            style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+      Test Connection
+    </button>
+    <div id="test-result" class="mt-4 text-sm"></div>
+  </div>
+
+</div>
+{% endblock %}

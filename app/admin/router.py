@@ -157,7 +157,7 @@ def _mask_config(config: dict) -> dict:
     return {k: "***" if k in _CREDENTIAL_KEYS else v for k, v in config.items()}
 
 
-@router.get("/pms", response_model=PMSConfigResponse)
+@router.get("/api/pms", response_model=PMSConfigResponse)
 async def get_pms_config(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_admin),
@@ -176,6 +176,22 @@ async def get_pms_config(
         last_sync_at=record.last_sync_at,
         config=_mask_config(config),
     )
+
+
+@router.get("/pms", response_class=HTMLResponse, include_in_schema=False)
+async def pms_page(request: Request, payload: dict = Depends(require_superadmin),
+                   db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(PMSAdapterModel).where(PMSAdapterModel.is_active == True))
+    adapter = result.scalar_one_or_none()
+    config = {}
+    if adapter and adapter.config_encrypted:
+        raw = decrypt_config(adapter.config_encrypted)
+        config = _mask_config(raw)
+    flash = request.session.pop("flash", None)
+    return _templates.TemplateResponse("pms.html", {
+        "request": request, "current_user": payload, "config": config,
+        "adapter_type": adapter.type.value if adapter else None, "flash": flash,
+    })
 
 
 @router.put("/pms")

@@ -48,7 +48,7 @@ async def admin_client():
 @pytest.mark.asyncio
 async def test_get_pms_returns_config_with_masked_credentials(admin_client):
     client, _ = admin_client
-    resp = await client.get("/admin/pms")
+    resp = await client.get("/admin/api/pms")
     assert resp.status_code == 200
     data = resp.json()
     assert data["type"] == "cloudbeds"
