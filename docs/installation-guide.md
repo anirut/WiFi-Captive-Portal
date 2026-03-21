@@ -1,6 +1,7 @@
 # คู่มือการติดตั้ง WiFi Captive Portal
 
 > ระบบปฏิบัติการที่รองรับ: **Ubuntu 22.04 LTS / Ubuntu 24.04 LTS**
+> เวอร์ชัน: Phase 3 (Admin Dashboard + DHCP/DNS)
 > ต้องใช้สิทธิ์ root
 
 ---
@@ -26,8 +27,9 @@
 | Python | 3.12+ |
 | PostgreSQL | 12+ |
 | Redis | 6+ |
-| iptables | (pre-installed) |
+| nftables | 0.9.3+ (kernel 4.16+) |
 | iproute2 (tc) | (pre-installed) |
+| dnsmasq | 2.x |
 
 ---
 
@@ -125,7 +127,8 @@ sudo apt-get install -y \
     postgresql postgresql-contrib \
     redis-server \
     iptables iptables-persistent netfilter-persistent \
-    iproute2
+    iproute2 \
+    dnsmasq
 
 # หาก Ubuntu ไม่มี Python 3.12 ให้ใช้ deadsnakes PPA
 sudo add-apt-repository ppa:deadsnakes/ppa
@@ -159,7 +162,23 @@ redis-cli ping
 # ควรได้: PONG
 ```
 
-### ขั้นตอนที่ 4: ตั้งค่า Python Environment
+### ขั้นตอนที่ 4: ตั้งค่า dnsmasq
+
+```bash
+# หยุด dnsmasq ชั่วคราว (จะถูกจัดการโดย portal app)
+sudo systemctl stop dnsmasq
+
+# ตั้งค่าให้โหลดเฉพาะ config ใน drop-in directory
+echo "conf-dir=/etc/dnsmasq.d/,*.conf" | sudo tee /etc/dnsmasq.conf
+
+# สร้าง drop-in directory
+sudo mkdir -p /etc/dnsmasq.d
+
+# enable service (แต่ยังไม่ start)
+sudo systemctl enable dnsmasq
+```
+
+### ขั้นตอนที่ 5: ตั้งค่า Python Environment
 
 ```bash
 cd /opt/captive-portal
@@ -172,7 +191,7 @@ python3.12 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-### ขั้นตอนที่ 5: สร้างไฟล์ .env
+### ขั้นตอนที่ 6: สร้างไฟล์ .env
 
 ```bash
 # Generate secrets
@@ -202,7 +221,7 @@ EOF
 chmod 600 .env
 ```
 
-### ขั้นตอนที่ 6: รัน Database Migration
+### ขั้นตอนที่ 7: รัน Database Migration
 
 ```bash
 cd /opt/captive-portal
@@ -212,11 +231,12 @@ cd /opt/captive-portal
 ผลลัพธ์ที่ควรได้:
 ```
 INFO  [alembic.runtime.migration] Running upgrade  -> f0b338e7, add opera_fias opera_cloud adapter types
+INFO  [alembic.runtime.migration] Running upgrade f0b338e7 -> xxxx, phase3 tables
 INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
 ```
 
-### ขั้นตอนที่ 7: สร้าง Admin User
+### ขั้นตอนที่ 8: สร้าง Admin User
 
 ```bash
 cd /opt/captive-portal
@@ -248,22 +268,22 @@ asyncio.run(create_admin())
 PYEOF
 ```
 
-### ขั้นตอนที่ 8: ตั้งค่า Network Rules
+### ขั้นตอนที่ 9: ตั้งค่า Network Rules
 
 ```bash
-# iptables (ต้องรัน root)
-sudo WIFI_IF=wlan0 PORTAL_IP=192.168.1.1 PORTAL_PORT=8080 \
-    bash scripts/setup-iptables.sh
+# nftables + flowtables + tc (ต้องรัน root)
+sudo bash scripts/setup-nftables.sh \
+    --wifi wlan0 \
+    --wan eth0 \
+    --portal-ip 192.168.1.1 \
+    --portal-port 8080 \
+    --dns-ip 8.8.8.8
 
-# tc (ต้องรัน root)
-sudo WAN_IF=eth0 \
-    bash scripts/setup-tc.sh
-
-# บันทึก rules ให้คงอยู่หลัง reboot
-sudo netfilter-persistent save
+# dnsmasq (ต้องรัน root)
+sudo bash scripts/setup-dnsmasq.sh
 ```
 
-### ขั้นตอนที่ 9: สร้าง systemd Service
+### ขั้นตอนที่ 10: สร้าง systemd Service
 
 ```bash
 sudo tee /etc/systemd/system/captive-portal.service <<EOF
@@ -277,8 +297,7 @@ Type=simple
 User=root
 WorkingDirectory=/opt/captive-portal
 EnvironmentFile=/opt/captive-portal/.env
-ExecStartPre=/opt/captive-portal/scripts/setup-iptables.sh
-ExecStartPre=/opt/captive-portal/scripts/setup-tc.sh
+ExecStartPre=/opt/captive-portal/scripts/setup-nftables.sh
 ExecStart=/opt/captive-portal/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 1
 Restart=on-failure
 RestartSec=5
@@ -294,7 +313,7 @@ sudo systemctl enable captive-portal
 sudo systemctl start captive-portal
 ```
 
-### ขั้นตอนที่ 10: ตรวจสอบ
+### ขั้นตอนที่ 11: ตรวจสอบ
 
 ```bash
 # ดู service status
@@ -305,6 +324,10 @@ journalctl -u captive-portal -f
 
 # ทดสอบ HTTP
 curl -s -o /dev/null -w "%{http_code}" http://192.168.1.1:8080/
+# ควรได้: 200
+
+# ทดสอบ Admin
+curl -s -o /dev/null -w "%{http_code}" http://192.168.1.1:8080/admin/login
 # ควรได้: 200
 ```
 
@@ -345,19 +368,60 @@ Internet
 - เซ็ต Default Gateway ของ WiFi network ให้ชี้มาที่ IP ของ Portal server
 - เช่น: WiFi subnet `192.168.1.0/24`, Gateway = `192.168.1.1` (IP ของ server)
 
-### ตรวจสอบ iptables rules
+### ตรวจสอบ nftables rules
 
 ```bash
-# ดู FORWARD chain
-sudo iptables -L FORWARD -n -v
+# ดู nftables table
+sudo nft list table inet captive_portal
 
-# ดู NAT PREROUTING
-sudo iptables -t nat -L PREROUTING -n -v
+# ดู whitelist set
+sudo nft list set inet captive_portal whitelist
+
+# ดู flowtable
+sudo nft list flowtable inet captive_portal ft
 
 # ดู tc rules
 sudo tc qdisc show dev eth0
 sudo tc class show dev eth0
 ```
+
+### ตรวจสอบ dnsmasq
+
+```bash
+# ดู status
+sudo systemctl status dnsmasq
+
+# ดู config
+cat /etc/dnsmasq.d/captive-portal.conf
+
+# ดู leases
+cat /var/lib/misc/dnsmasq.leases
+```
+
+---
+
+## การตั้งค่า DHCP/DNS
+
+หลังติดตั้งเสร็จ ให้ตั้งค่า DHCP ผ่าน Admin UI:
+
+1. เข้า Admin Panel: `http://192.168.1.1:8080/admin`
+2. Login ด้วย admin account
+3. ไปที่ **DHCP** menu
+4. ตั้งค่า:
+   - **Interface**: wlan0
+   - **Gateway IP**: 192.168.1.1
+   - **Subnet**: 192.168.1.0/24
+   - **DHCP Range**: 192.168.1.10 - 192.168.1.250
+   - **Lease Time**: 8h
+   - **DNS Mode**: redirect (แนะนำสำหรับ captive portal)
+5. กด **Save**
+
+### DNS Mode
+
+| Mode | พฤติกรรม | แนะนำเมื่อ |
+|------|----------|----------|
+| **redirect** | ตอบทุก DNS query ด้วย portal IP | Captive portal มาตรฐาน |
+| **forward** | ส่ง DNS ต่อไป upstream | มีปัญหากับบางอุปกรณ์ |
 
 ---
 
@@ -370,6 +434,7 @@ sudo bash scripts/uninstall.sh
 Script จะถามว่าจะลบอะไรบ้าง:
 - Service
 - iptables / tc rules
+- dnsmasq config
 - Database และ user (optional)
 - Virtual environment (optional)
 - .env file (optional)
@@ -412,6 +477,7 @@ journalctl -u captive-portal -n 50 --no-pager
 # - Port ถูกใช้: lsof -i :8080
 # - PostgreSQL ไม่ได้รัน: systemctl start postgresql
 # - Redis ไม่ได้รัน: systemctl start redis-server
+# - dnsmasq config error: dnsmasq --test
 ```
 
 ### Database Connection Error
@@ -427,9 +493,18 @@ sudo cat $(find /etc/postgresql -name pg_hba.conf)
 grep captive /etc/postgresql/*/main/pg_hba.conf
 ```
 
-### iptables ไม่ทำงาน
+### nftables ไม่ทำงาน
 
 ```bash
+# ตรวจว่า nftables ติดตั้ง
+nft --version
+
+# ตรวจ kernel version (ต้อง >= 4.16 สำหรับ flowtables)
+uname -r
+
+# ตรวจว่า table มีอยู่
+nft list tables
+
 # ตรวจว่า IP Forwarding เปิดอยู่
 cat /proc/sys/net/ipv4/ip_forward
 # ต้องได้ 1
@@ -437,16 +512,36 @@ cat /proc/sys/net/ipv4/ip_forward
 # ตรวจว่า WIFI_INTERFACE ถูกต้อง
 ip link show
 
-# รัน setup-iptables.sh ใหม่
-sudo WIFI_IF=wlan0 PORTAL_IP=192.168.1.1 PORTAL_PORT=8080 bash scripts/setup-iptables.sh
+# รัน setup-nftables.sh ใหม่
+sudo WIFI_IF=wlan0 PORTAL_IP=192.168.1.1 PORTAL_PORT=8080 bash scripts/setup-nftables.sh
+```
+
+### dnsmasq ไม่ทำงาน
+
+```bash
+# ทดสอบ config
+sudo dnsmasq --test -C /etc/dnsmasq.d/captive-portal.conf
+
+# ดู status
+sudo systemctl status dnsmasq
+
+# ดู logs
+journalctl -u dnsmasq -n 50
+
+# รัน manual
+sudo dnsmasq -d -C /etc/dnsmasq.d/captive-portal.conf
 ```
 
 ### แขก Login ไม่ได้ (PMS ไม่ response)
 
 ```bash
-# ทดสอบ PMS connection ผ่าน admin endpoint
+# ทดสอบ PMS connection ผ่าน admin UI
+# ไปที่ /admin/pms แล้วกด "Test Connection"
+
+# หรือใช้ API
 curl -X POST http://localhost:8080/admin/pms/test \
   -H "Content-Type: application/json" \
+  -H "Cookie: admin_token=YOUR_TOKEN" \
   -d '{"type": "cloudbeds", "config": {"api_key": "xxx", "property_id": "yyy"}}'
 ```
 
@@ -458,6 +553,39 @@ redis-cli keys "rate_limit:*"
 
 # ลบ rate limit สำหรับ IP หนึ่ง (กรณี test)
 redis-cli del "rate_limit:192.168.1.100"
+```
+
+### Admin Login ไม่ได้
+
+```bash
+# รีเซ็ต password
+cd /opt/captive-portal
+.venv/bin/python - <<'PYEOF'
+import asyncio, os, sys
+os.chdir("/opt/captive-portal")
+sys.path.insert(0, "/opt/captive-portal")
+
+async def reset_password():
+    from app.core.database import AsyncSessionFactory
+    from app.core.models import AdminUser
+    from passlib.context import CryptContext
+    from sqlalchemy import select
+
+    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    new_hash = pwd_ctx.hash("new_password_here")
+
+    async with AsyncSessionFactory() as db:
+        result = await db.execute(select(AdminUser).where(AdminUser.username == "admin"))
+        admin = result.scalar_one_or_none()
+        if admin:
+            admin.password_hash = new_hash
+            await db.commit()
+            print("Password reset.")
+        else:
+            print("Admin user not found.")
+
+asyncio.run(reset_password())
+PYEOF
 ```
 
 ---
@@ -481,9 +609,13 @@ bash /opt/captive-portal/scripts/test.sh --quick    # เร็ว ข้าม 
 bash /opt/captive-portal/scripts/test.sh --verbose  # แสดง error detail
 
 # Reset network rules
-sudo bash /opt/captive-portal/scripts/setup-iptables.sh
-sudo bash /opt/captive-portal/scripts/setup-tc.sh
+sudo bash /opt/captive-portal/scripts/setup-nftables.sh
+sudo bash /opt/captive-portal/scripts/setup-dnsmasq.sh
 
 # Run migrations
 cd /opt/captive-portal && .venv/bin/alembic upgrade head
+
+# dnsmasq
+sudo systemctl restart dnsmasq
+cat /var/lib/misc/dnsmasq.leases
 ```
