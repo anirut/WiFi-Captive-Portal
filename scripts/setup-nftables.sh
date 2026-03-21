@@ -141,7 +141,14 @@ fi
 if tc qdisc show dev $WAN_IF | grep -q "htb"; then
     echo "  ✓ tc HTB on WAN verified"
 else
-    echo "  ✗ tc HTB verification failed"
+    echo "  ✗ tc HTB on WAN verification failed"
+    exit 1
+fi
+
+if tc qdisc show dev ifb0 | grep -q "htb"; then
+    echo "  ✓ tc HTB on IFB verified"
+else
+    echo "  ✗ tc HTB on IFB verification failed"
     exit 1
 fi
 
