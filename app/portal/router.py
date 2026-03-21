@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
@@ -11,7 +12,7 @@ from app.pms.factory import get_adapter
 from app.network.session_manager import SessionManager
 from app.voucher.generator import validate_voucher, VoucherValidationError
 from app.portal.schemas import RoomAuthRequest, VoucherAuthRequest, SessionResponse
-from app.core.models import Room, Policy, Session, SessionStatus
+from app.core.models import Guest, Room, Policy, Session, SessionStatus
 import logging
 
 logger = logging.getLogger(__name__)
@@ -63,9 +64,32 @@ async def auth_room(
     up_kbps = policy.bandwidth_up_kbps if policy else 0
     down_kbps = policy.bandwidth_down_kbps if policy else 0
 
+    # Upsert local Guest record so sessions can be linked and expired by room
+    if guest_info.pms_id:
+        guest_result = await db.execute(sa_select(Guest).where(Guest.pms_guest_id == guest_info.pms_id))
+    else:
+        guest_result = await db.execute(sa_select(Guest).where(Guest.room_number == guest_info.room_number))
+    guest = guest_result.scalar_one_or_none()
+    if guest is None:
+        guest = Guest(
+            id=uuid.uuid4(),
+            room_number=guest_info.room_number,
+            last_name=guest_info.last_name,
+            first_name=guest_info.first_name,
+            pms_guest_id=guest_info.pms_id,
+            check_in=guest_info.check_in,
+            check_out=guest_info.check_out,
+        )
+        db.add(guest)
+        await db.flush()
+    else:
+        guest.check_in = guest_info.check_in
+        guest.check_out = guest_info.check_out
+        guest.last_name = guest_info.last_name
+
     session = await session_manager.create_session(
         db=db, ip=request.client.host,
-        guest_id=None,
+        guest_id=guest.id,
         expires_at=expires_at,
         bandwidth_up_kbps=up_kbps,
         bandwidth_down_kbps=down_kbps,
