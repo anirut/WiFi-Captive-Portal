@@ -52,3 +52,57 @@ async def test_auth_room_tc_not_accepted(client):
         "room_number": "101", "last_name": "Smith", "tc_accepted": False
     })
     assert response.status_code == 422
+
+@pytest.mark.asyncio
+async def test_auth_room_max_devices_reached(client):
+    """Returns 429 when guest already has max_devices active sessions."""
+    guest_info = GuestInfo(
+        pms_id="pms-2", room_number="102", last_name="Jones",
+        check_in=datetime.now(timezone.utc) - timedelta(hours=1),
+        check_out=datetime.now(timezone.utc) + timedelta(hours=23),
+    )
+    # Simulate an existing guest with max_devices=1 already at limit (1 active session)
+    existing_guest = MagicMock()
+    existing_guest.id = "guest-uuid"
+    existing_guest.max_devices = 1
+
+    with patch("app.portal.router.get_adapter") as mock_adapter_fn, \
+         patch("app.portal.router.session_manager"):
+        mock_adapter = AsyncMock()
+        mock_adapter.verify_guest = AsyncMock(return_value=guest_info)
+        mock_adapter_fn.return_value = mock_adapter
+
+        # db.execute calls: (1) Room lookup, (2) Guest lookup → return existing_guest,
+        # (3) active session count → return 1
+        mock_results = [
+            MagicMock(**{"scalar_one_or_none.return_value": None}),        # Room → None
+            MagicMock(**{"scalar_one_or_none.return_value": existing_guest}),  # Guest → existing
+            MagicMock(**{"scalar_one_or_none.return_value": 1}),           # count → 1
+        ]
+        from app.core.database import get_db
+        from app.main import app
+        call_count = 0
+
+        async def mock_db_gen():
+            mock_db = AsyncMock()
+            nonlocal call_count
+            def side_effect(*args, **kwargs):
+                nonlocal call_count
+                result = mock_results[min(call_count, len(mock_results) - 1)]
+                call_count += 1
+                import asyncio
+                future = asyncio.get_event_loop().create_future()
+                future.set_result(result)
+                return future
+            mock_db.execute = side_effect
+            yield mock_db
+
+        app.dependency_overrides[get_db] = mock_db_gen
+
+        response = await client.post("/auth/room", json={
+            "room_number": "102", "last_name": "Jones", "tc_accepted": True
+        })
+        app.dependency_overrides.pop(get_db, None)
+
+        assert response.status_code == 429
+        assert response.json()["detail"]["error"] == "max_devices_reached"

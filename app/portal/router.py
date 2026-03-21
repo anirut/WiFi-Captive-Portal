@@ -12,6 +12,7 @@ from app.pms.factory import get_adapter
 from app.network.session_manager import SessionManager
 from app.voucher.generator import validate_voucher, VoucherValidationError
 from app.portal.schemas import RoomAuthRequest, VoucherAuthRequest, SessionResponse
+from sqlalchemy import func
 from app.core.models import Guest, Room, Policy, Session, SessionStatus
 import logging
 
@@ -79,6 +80,7 @@ async def auth_room(
             pms_guest_id=guest_info.pms_id,
             check_in=guest_info.check_in,
             check_out=guest_info.check_out,
+            max_devices=3,
         )
         db.add(guest)
         await db.flush()
@@ -86,6 +88,17 @@ async def auth_room(
         guest.check_in = guest_info.check_in
         guest.check_out = guest_info.check_out
         guest.last_name = guest_info.last_name
+
+    # Enforce max concurrent devices per guest
+    count_result = await db.execute(
+        sa_select(func.count()).select_from(Session).where(
+            Session.guest_id == guest.id,
+            Session.status == SessionStatus.active,
+        )
+    )
+    active_count = count_result.scalar_one_or_none() or 0
+    if active_count >= guest.max_devices:
+        raise HTTPException(status_code=429, detail={"error": "max_devices_reached"})
 
     session = await session_manager.create_session(
         db=db, ip=request.client.host,
