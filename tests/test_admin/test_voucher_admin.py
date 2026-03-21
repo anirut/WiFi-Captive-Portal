@@ -8,8 +8,8 @@ from app.core.models import VoucherType
 
 @pytest_asyncio.fixture
 async def admin_client():
-    with patch("app.network.iptables.add_whitelist"), \
-         patch("app.network.iptables.remove_whitelist"), \
+    with patch("app.network.nftables.NftablesManager.add_to_whitelist"), \
+         patch("app.network.nftables.NftablesManager.remove_from_whitelist"), \
          patch("app.network.tc.apply_bandwidth_limit"), \
          patch("app.network.tc.remove_bandwidth_limit"), \
          patch("app.network.arp.get_mac_for_ip", return_value=None), \
@@ -59,7 +59,7 @@ async def test_delete_nonexistent_voucher_returns_404(admin_client):
 
 @pytest.mark.asyncio
 async def test_create_voucher_requires_auth():
-    with patch("app.network.iptables.add_whitelist"), \
+    with patch("app.network.nftables.NftablesManager.add_to_whitelist"), \
          patch("app.network.tc.apply_bandwidth_limit"), \
          patch("app.network.arp.get_mac_for_ip", return_value=None), \
          patch("app.network.scheduler.start_scheduler"), \
