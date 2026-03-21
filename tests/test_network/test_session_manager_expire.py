@@ -15,6 +15,7 @@ async def test_expire_session_calls_remove_bandwidth_limit_with_up_kbps():
     mock_db = AsyncMock()
 
     with patch("app.network.session_manager.remove_whitelist") as mock_rw, \
+         patch("app.network.session_manager.remove_dns_bypass"), \
          patch("app.network.session_manager.remove_bandwidth_limit") as mock_rbl:
         mgr = SessionManager(wifi_if="wlan0", wan_if="eth0")
         await mgr.expire_session(mock_db, mock_session)

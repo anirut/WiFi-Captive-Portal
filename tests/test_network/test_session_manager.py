@@ -16,6 +16,7 @@ async def test_create_session_adds_whitelist(manager):
     mock_db.refresh = AsyncMock()
 
     with patch("app.network.session_manager.add_whitelist") as mock_ipt, \
+         patch("app.network.session_manager.add_dns_bypass"), \
          patch("app.network.session_manager.apply_bandwidth_limit") as mock_tc, \
          patch("app.network.session_manager.get_mac_for_ip", return_value="aa:bb:cc:dd:ee:ff"):
 
@@ -39,6 +40,7 @@ async def test_expire_session_removes_whitelist(manager):
     mock_session.status.value = "active"
 
     with patch("app.network.session_manager.remove_whitelist") as mock_ipt, \
+         patch("app.network.session_manager.remove_dns_bypass"), \
          patch("app.network.session_manager.remove_bandwidth_limit") as mock_tc:
         await manager.expire_session(db=mock_db, session=mock_session)
         mock_ipt.assert_called_once_with("192.168.1.45")
@@ -63,6 +65,7 @@ async def test_expire_overdue_sessions_returns_count(manager):
     mock_db.commit = AsyncMock()
 
     with patch("app.network.session_manager.remove_whitelist"), \
+         patch("app.network.session_manager.remove_dns_bypass"), \
          patch("app.network.session_manager.remove_bandwidth_limit"):
         count = await manager.expire_overdue_sessions(db=mock_db)
 
@@ -85,6 +88,7 @@ async def test_expire_sessions_for_room_expires_active_sessions(manager):
     mock_db.commit = AsyncMock()
 
     with patch("app.network.session_manager.remove_whitelist") as mock_ipt, \
+         patch("app.network.session_manager.remove_dns_bypass"), \
          patch("app.network.session_manager.remove_bandwidth_limit") as mock_tc:
         count = await manager.expire_sessions_for_room(mock_db, "101")
 

@@ -29,3 +29,29 @@ def is_whitelisted(ip: str) -> bool:
         check=False, capture_output=True
     )
     return result.returncode == 0
+
+
+def add_dns_bypass(ip: str) -> None:
+    """DNAT port-53 from authenticated guest IP to 8.8.8.8, bypassing dnsmasq redirect."""
+    for proto in ("udp", "tcp"):
+        try:
+            _run([
+                "iptables", "-t", "nat", "-I", "PREROUTING",
+                "-s", ip, "-p", proto, "--dport", "53",
+                "-j", "DNAT", "--to-destination", "8.8.8.8:53"
+            ])
+        except subprocess.CalledProcessError as e:
+            logger.error(f"iptables add_dns_bypass failed for {ip}/{proto}: {e.stderr}")
+            raise
+    logger.info(f"iptables: added dns bypass for {ip}")
+
+
+def remove_dns_bypass(ip: str) -> None:
+    """Remove DNS bypass DNAT rules for an expired guest IP."""
+    for proto in ("udp", "tcp"):
+        subprocess.run([
+            "iptables", "-t", "nat", "-D", "PREROUTING",
+            "-s", ip, "-p", proto, "--dport", "53",
+            "-j", "DNAT", "--to-destination", "8.8.8.8:53"
+        ], check=False, capture_output=True)
+    logger.info(f"iptables: removed dns bypass for {ip}")
