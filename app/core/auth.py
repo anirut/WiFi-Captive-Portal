@@ -23,3 +23,27 @@ async def revoke_token(token: str, redis_client: Any) -> None:
         ttl = int(payload["exp"] - datetime.now(timezone.utc).timestamp())
         if ttl > 0:
             await redis_client.setex(f"revoked:{token}", ttl, "1")
+
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+_bearer = HTTPBearer(auto_error=False)
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> dict:
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "not_authenticated"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    payload = decode_access_token(credentials.credentials)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "invalid_token"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return payload

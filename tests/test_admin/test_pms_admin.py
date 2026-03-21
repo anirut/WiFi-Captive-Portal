@@ -33,7 +33,13 @@ async def admin_client():
         app.dependency_overrides[get_db] = override_get_db
         app.state.redis = AsyncMock()
 
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        from app.core.auth import create_access_token
+        token = create_access_token({"sub": "admin", "role": "superadmin"})
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            headers={"Authorization": f"Bearer {token}"},
+        ) as c:
             yield c, mock_db
 
         app.dependency_overrides.clear()
