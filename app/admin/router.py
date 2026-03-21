@@ -2,6 +2,7 @@ import time
 import uuid
 import bcrypt as _bcrypt
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -12,6 +13,7 @@ from app.core.database import get_db
 from app.core.models import Session, SessionStatus, PMSAdapter as PMSAdapterModel, PMSAdapterType, AdminUser, Voucher, VoucherType
 from app.core.encryption import encrypt_config, decrypt_config
 from app.core.auth import get_current_user, get_current_admin, create_access_token, decode_access_token
+from app.core.config import settings
 from app.network.session_manager import SessionManager
 from app.pms.factory import load_adapter, ADAPTER_MAP
 from app.admin.schemas import PMSConfigResponse, PMSConfigUpdate, PMSTestResult, VoucherCreate, VoucherResponse
@@ -59,8 +61,14 @@ async def login_submit(request: Request, db: AsyncSession = Depends(get_db)):
     await db.commit()
     token = create_access_token({"sub": user.username, "role": user.role.value})
     next_url = request.query_params.get("next", "/admin/")
+    # Fix 1: Reject absolute URLs to prevent open redirect
+    parsed = urlparse(next_url)
+    if parsed.scheme or parsed.netloc:
+        next_url = "/admin/"
     resp = RedirectResponse(url=next_url, status_code=302)
-    resp.set_cookie("admin_token", token, httponly=True, samesite="lax")
+    # Fix 2: Set secure cookie flag based on environment
+    _secure = settings.ENVIRONMENT.lower() == "production"
+    resp.set_cookie("admin_token", token, httponly=True, samesite="lax", secure=_secure)
     return resp
 
 
