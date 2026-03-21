@@ -73,6 +73,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column('sessions', 'bandwidth_up_kbps')
+    # Drop policies only if it exists (mirror of conditional creation in upgrade)
+    conn = op.get_bind()
+    if conn.dialect.has_table(conn, 'policies'):
+        op.drop_table('policies')
     op.drop_index('ix_usage_snapshots_snapshot_at', table_name='usage_snapshots')
     op.drop_table('brand_config')
     op.drop_table('usage_snapshots')
