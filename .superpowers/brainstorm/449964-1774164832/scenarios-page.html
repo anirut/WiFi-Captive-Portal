@@ -1,0 +1,118 @@
+<h2>Scenarios Page</h2>
+<p class="subtitle">Predefined test scenarios with guest data and failure rules</p>
+
+<div class="mockup">
+  <div class="mockup-header">Scenarios - FIAS Emulator</div>
+  <div class="mockup-body">
+    <!-- Top Nav -->
+    <div class="mock-nav" style="background: #1e293b; color: #94a3b8; padding: 0.75rem 1rem; display: flex; gap: 1.5rem;">
+      <span style="color: #f8fafc; font-weight: 600;">FIAS Emulator</span>
+      <span>Dashboard</span>
+      <span>Guests</span>
+      <span style="color: #38bdf8;">Scenarios</span>
+      <span>Failures</span>
+      <span>Activity</span>
+    </div>
+
+    <div style="padding: 1rem;">
+      <!-- Active Scenario Banner -->
+      <div style="background: linear-gradient(90deg, #1e40af, #3b82f6); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-size: 0.75rem; color: #93c5fd; text-transform: uppercase;">Active Scenario</div>
+          <div style="color: #fff; font-size: 1.25rem; font-weight: 600; margin-top: 0.25rem;">Happy Path</div>
+        </div>
+        <button class="mock-button" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);">Deactivate</button>
+      </div>
+
+      <!-- Scenario Cards Grid -->
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+        <!-- Scenario 1: Happy Path (Active) -->
+        <div style="background: #1e293b; border-radius: 8px; padding: 1rem; border: 2px solid #3b82f6;">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <h4 style="color: #f8fafc; margin: 0;">Happy Path</h4>
+                <span style="background: #3b82f6; color: #fff; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.7rem;">ACTIVE</span>
+              </div>
+              <p style="color: #94a3b8; font-size: 0.875rem; margin: 0.5rem 0 0 0;">Standard guest lookup with valid credentials and dates</p>
+            </div>
+          </div>
+          <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+            <span style="background: #1e3a5f; color: #60a5fa; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">5 guests</span>
+            <span style="background: #1e3a5f; color: #60a5fa; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">0 failures</span>
+          </div>
+        </div>
+
+        <!-- Scenario 2: Connection Failures -->
+        <div style="background: #1e293b; border-radius: 8px; padding: 1rem; border: 2px solid transparent;">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <h4 style="color: #f8fafc; margin: 0;">Connection Failures</h4>
+              <p style="color: #94a3b8; font-size: 0.875rem; margin: 0.5rem 0 0 0;">Test connection drops, timeouts, and login rejections</p>
+            </div>
+            <button class="mock-button" style="background: #22c55e; font-size: 0.75rem;">Activate</button>
+          </div>
+          <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+            <span style="background: #374151; color: #9ca3af; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">3 guests</span>
+            <span style="background: #7f1d1d; color: #fca5a5; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">3 failures</span>
+          </div>
+        </div>
+
+        <!-- Scenario 3: Protocol Errors -->
+        <div style="background: #1e293b; border-radius: 8px; padding: 1rem; border: 2px solid transparent;">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <h4 style="color: #f8fafc; margin: 0;">Protocol Errors</h4>
+              <p style="color: #94a3b8; font-size: 0.875rem; margin: 0.5rem 0 0 0;">Malformed XML, missing fields, unknown record types</p>
+            </div>
+            <button class="mock-button" style="background: #22c55e; font-size: 0.75rem;">Activate</button>
+          </div>
+          <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+            <span style="background: #374151; color: #9ca3af; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">2 guests</span>
+            <span style="background: #7f1d1d; color: #fca5a5; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">4 failures</span>
+          </div>
+        </div>
+
+        <!-- Scenario 4: Edge Cases -->
+        <div style="background: #1e293b; border-radius: 8px; padding: 1rem; border: 2px solid transparent;">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <h4 style="color: #f8fafc; margin: 0;">Edge Cases</h4>
+              <p style="color: #94a3b8; font-size: 0.875rem; margin: 0.5rem 0 0 0;">Multi-guest rooms, same-day turnover, early check-in</p>
+            </div>
+            <button class="mock-button" style="background: #22c55e; font-size: 0.75rem;">Activate</button>
+          </div>
+          <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+            <span style="background: #374151; color: #9ca3af; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">8 guests</span>
+            <span style="background: #374151; color: #9ca3af; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">0 failures</span>
+          </div>
+        </div>
+
+        <!-- Scenario 5: Business Logic Failures -->
+        <div style="background: #1e293b; border-radius: 8px; padding: 1rem; border: 2px solid transparent;">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <h4 style="color: #f8fafc; margin: 0;">Business Logic</h4>
+              <p style="color: #94a3b8; font-size: 0.875rem; margin: 0.5rem 0 0 0;">Mid-session checkout, room reassignment, duplicates</p>
+            </div>
+            <button class="mock-button" style="background: #22c55e; font-size: 0.75rem;">Activate</button>
+          </div>
+          <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+            <span style="background: #374151; color: #9ca3af; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">4 guests</span>
+            <span style="background: #7f1d1d; color: #fca5a5; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">2 failures</span>
+          </div>
+        </div>
+
+        <!-- Create New Scenario -->
+        <div style="background: #0f172a; border-radius: 8px; padding: 1rem; border: 2px dashed #334155; display: flex; align-items: center; justify-content: center; min-height: 120px; cursor: pointer;">
+          <div style="text-align: center;">
+            <div style="color: #64748b; font-size: 1.5rem;">+</div>
+            <div style="color: #64748b; font-size: 0.875rem;">Create New Scenario</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top: 1rem; color: #94a3b8;">Scenario cards with activate buttons. Active scenario highlighted. Shows guest count and failure rule count per scenario.</p>

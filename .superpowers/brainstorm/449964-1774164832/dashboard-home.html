@@ -1,0 +1,103 @@
+<h2>FIAS Emulator Dashboard</h2>
+<p class="subtitle">Home page showing connections and activity feed</p>
+
+<div class="mockup">
+  <div class="mockup-header">Dashboard - FIAS Emulator</div>
+  <div class="mockup-body">
+    <!-- Top Nav -->
+    <div class="mock-nav" style="background: #1e293b; color: #94a3b8; padding: 0.75rem 1rem; display: flex; gap: 1.5rem;">
+      <span style="color: #f8fafc; font-weight: 600;">FIAS Emulator</span>
+      <span style="color: #38bdf8;">Dashboard</span>
+      <span>Guests</span>
+      <span>Scenarios</span>
+      <span>Failures</span>
+      <span>Activity</span>
+    </div>
+
+    <div style="display: flex; padding: 1rem;">
+      <!-- Left Column: Status Cards -->
+      <div style="width: 300px; padding-right: 1rem;">
+        <!-- Server Status -->
+        <div style="background: #1e293b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+          <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem;">Server Status</div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></div>
+            <span style="color: #f8fafc;">Running on port 9090</span>
+          </div>
+        </div>
+
+        <!-- Active Connections -->
+        <div style="background: #1e293b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+          <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem;">Active Connections</div>
+          <div style="color: #f8fafc; font-size: 2rem; font-weight: 600;">2</div>
+          <div style="font-size: 0.875rem; color: #94a3b8; margin-top: 0.5rem;">
+            <div style="display: flex; justify-content: space-between;">
+              <span>192.168.1.100:54321</span>
+              <span style="color: #22c55e;">connected</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 0.25rem;">
+              <span>192.168.1.101:54322</span>
+              <span style="color: #22c55e;">connected</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div style="background: #1e293b; border-radius: 8px; padding: 1rem;">
+          <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem;">Quick Actions</div>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <button class="mock-button" style="background: #3b82f6; width: 100%;">+ Add Guest</button>
+            <button class="mock-button" style="background: #64748b; width: 100%;">Reset All Data</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Activity Feed -->
+      <div style="flex: 1; background: #1e293b; border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.75rem;">Activity Feed (Real-time)</div>
+
+        <!-- Activity Items -->
+        <div style="font-family: monospace; font-size: 0.8rem;">
+          <div style="padding: 0.5rem; border-bottom: 1px solid #334155;">
+            <span style="color: #64748b;">14:32:05</span>
+            <span style="color: #fbbf24; margin-left: 0.5rem;">[GIQ]</span>
+            <span style="color: #94a3b8; margin-left: 0.5rem;">Room 101, Smith</span>
+            <span style="color: #22c55e; margin-left: 0.5rem;">→ GI found</span>
+          </div>
+          <div style="padding: 0.5rem; border-bottom: 1px solid #334155;">
+            <span style="color: #64748b;">14:31:58</span>
+            <span style="color: #38bdf8; margin-left: 0.5rem;">[KA]</span>
+            <span style="color: #94a3b8; margin-left: 0.5rem;">Heartbeat</span>
+            <span style="color: #22c55e; margin-left: 0.5rem;">→ KR</span>
+          </div>
+          <div style="padding: 0.5rem; border-bottom: 1px solid #334155;">
+            <span style="color: #64748b;">14:31:45</span>
+            <span style="color: #a78bfa; margin-left: 0.5rem;">[LR]</span>
+            <span style="color: #94a3b8; margin-left: 0.5rem;">Login from 192.168.1.101</span>
+            <span style="color: #22c55e; margin-left: 0.5rem;">→ LA OK</span>
+          </div>
+          <div style="padding: 0.5rem; border-bottom: 1px solid #334155;">
+            <span style="color: #64748b;">14:31:44</span>
+            <span style="color: #f87171; margin-left: 0.5rem;">[GIQ]</span>
+            <span style="color: #94a3b8; margin-left: 0.5rem;">Room 999, Unknown</span>
+            <span style="color: #f87171; margin-left: 0.5rem;">→ Not found</span>
+          </div>
+          <div style="padding: 0.5rem; border-bottom: 1px solid #334155;">
+            <span style="color: #64748b;">14:30:12</span>
+            <span style="color: #a78bfa; margin-left: 0.5rem;">[DRQ]</span>
+            <span style="color: #94a3b8; margin-left: 0.5rem;">Departures 03-22-26</span>
+            <span style="color: #22c55e; margin-left: 0.5rem;">→ 2 rooms</span>
+          </div>
+          <div style="padding: 0.5rem; border-bottom: 1px solid #334155;">
+            <span style="color: #64748b;">14:30:00</span>
+            <span style="color: #a78bfa; margin-left: 0.5rem;">[LR]</span>
+            <span style="color: #94a3b8; margin-left: 0.5rem;">Login from 192.168.1.100</span>
+            <span style="color: #22c55e; margin-left: 0.5rem;">→ LA OK</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top: 1rem; color: #94a3b8;">This is the main dashboard showing server status, active FIAS connections, and a real-time activity feed of all protocol messages.</p>

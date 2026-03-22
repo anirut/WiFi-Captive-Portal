@@ -1,0 +1,115 @@
+<h2>Guests Management Page</h2>
+<p class="subtitle">Manage test guest data that FIAS will return</p>
+
+<div class="mockup">
+  <div class="mockup-header">Guests - FIAS Emulator</div>
+  <div class="mockup-body">
+    <!-- Top Nav -->
+    <div class="mock-nav" style="background: #1e293b; color: #94a3b8; padding: 0.75rem 1rem; display: flex; gap: 1.5rem;">
+      <span style="color: #f8fafc; font-weight: 600;">FIAS Emulator</span>
+      <span>Dashboard</span>
+      <span style="color: #38bdf8;">Guests</span>
+      <span>Scenarios</span>
+      <span>Failures</span>
+      <span>Activity</span>
+    </div>
+
+    <div style="padding: 1rem;">
+      <!-- Header with Add Button -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+          <h3 style="color: #f8fafc; margin: 0;">Test Guests</h3>
+          <span style="color: #94a3b8; font-size: 0.875rem;">5 guests configured</span>
+        </div>
+        <button class="mock-button" style="background: #22c55e;">+ Add Guest</button>
+      </div>
+
+      <!-- Guest Table -->
+      <div style="background: #1e293b; border-radius: 8px; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+          <thead>
+            <tr style="background: #0f172a; color: #94a3b8; text-align: left;">
+              <th style="padding: 0.75rem;">Room</th>
+              <th style="padding: 0.75rem;">Last Name</th>
+              <th style="padding: 0.75rem;">First Name</th>
+              <th style="padding: 0.75rem;">Reservation</th>
+              <th style="padding: 0.75rem;">Check-in</th>
+              <th style="padding: 0.75rem;">Check-out</th>
+              <th style="padding: 0.75rem;">Status</th>
+              <th style="padding: 0.75rem;">Actions</th>
+            </tr>
+          </thead>
+          <tbody style="color: #e2e8f0;">
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 0.75rem;">101</td>
+              <td style="padding: 0.75rem;">Smith</td>
+              <td style="padding: 0.75rem;">John</td>
+              <td style="padding: 0.75rem; font-family: monospace; color: #94a3b8;">RES-001</td>
+              <td style="padding: 0.75rem;">03-20-26</td>
+              <td style="padding: 0.75rem;">03-25-26</td>
+              <td style="padding: 0.75rem;"><span style="background: #166534; color: #4ade80; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem;">Active</span></td>
+              <td style="padding: 0.75rem;">
+                <span style="color: #38bdf8; cursor: pointer;">Edit</span>
+                <span style="color: #f87171; margin-left: 0.5rem; cursor: pointer;">Delete</span>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 0.75rem;">102</td>
+              <td style="padding: 0.75rem;">Johnson</td>
+              <td style="padding: 0.75rem;">Emma</td>
+              <td style="padding: 0.75rem; font-family: monospace; color: #94a3b8;">RES-002</td>
+              <td style="padding: 0.75rem;">03-21-26</td>
+              <td style="padding: 0.75rem;">03-23-26</td>
+              <td style="padding: 0.75rem;"><span style="background: #166534; color: #4ade80; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem;">Active</span></td>
+              <td style="padding: 0.75rem;">
+                <span style="color: #38bdf8; cursor: pointer;">Edit</span>
+                <span style="color: #f87171; margin-left: 0.5rem; cursor: pointer;">Delete</span>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #334155; background: rgba(251, 191, 36, 0.1);">
+              <td style="padding: 0.75rem;">201</td>
+              <td style="padding: 0.75rem;">Williams</td>
+              <td style="padding: 0.75rem;">Mike</td>
+              <td style="padding: 0.75rem; font-family: monospace; color: #94a3b8;">RES-003</td>
+              <td style="padding: 0.75rem;">03-18-26</td>
+              <td style="padding: 0.75rem;">03-22-26</td>
+              <td style="padding: 0.75rem;"><span style="background: #854d0e; color: #fbbf24; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem;">Checking out</span></td>
+              <td style="padding: 0.75rem;">
+                <span style="color: #38bdf8; cursor: pointer;">Edit</span>
+                <span style="color: #f87171; margin-left: 0.5rem; cursor: pointer;">Delete</span>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 0.75rem;">205</td>
+              <td style="padding: 0.75rem;">Brown</td>
+              <td style="padding: 0.75rem;">Sarah</td>
+              <td style="padding: 0.75rem; font-family: monospace; color: #94a3b8;">RES-004</td>
+              <td style="padding: 0.75rem;">03-22-26</td>
+              <td style="padding: 0.75rem;">03-28-26</td>
+              <td style="padding: 0.75rem;"><span style="background: #166534; color: #4ade80; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem;">Active</span></td>
+              <td style="padding: 0.75rem;">
+                <span style="color: #38bdf8; cursor: pointer;">Edit</span>
+                <span style="color: #f87171; margin-left: 0.5rem; cursor: pointer;">Delete</span>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #334155;">
+              <td style="padding: 0.75rem;">301</td>
+              <td style="padding: 0.75rem;">Davis</td>
+              <td style="padding: 0.75rem;">—</td>
+              <td style="padding: 0.75rem; font-family: monospace; color: #94a3b8;">—</td>
+              <td style="padding: 0.75rem;">—</td>
+              <td style="padding: 0.75rem;">—</td>
+              <td style="padding: 0.75rem;"><span style="background: #374151; color: #9ca3af; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem;">Empty room</span></td>
+              <td style="padding: 0.75rem;">
+                <span style="color: #38bdf8; cursor: pointer;">Edit</span>
+                <span style="color: #f87171; margin-left: 0.5rem; cursor: pointer;">Delete</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top: 1rem; color: #94a3b8;">Guest table with inline edit/delete. Shows check-in/out dates in FIAS format (MM-DD-YY). Status badges indicate guest state.</p>

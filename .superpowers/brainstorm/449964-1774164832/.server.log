@@ -1,0 +1,8 @@
+{"type":"server-started","port":63128,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:63128","screen_dir":"/home/anirut/DEV/vibe-coding/WiFi_Captive_Portal/.superpowers/brainstorm/449964-1774164832"}
+{"type":"screen-added","file":"/home/anirut/DEV/vibe-coding/WiFi_Captive_Portal/.superpowers/brainstorm/449964-1774164832/dashboard-home.html"}
+{"type":"screen-added","file":"/home/anirut/DEV/vibe-coding/WiFi_Captive_Portal/.superpowers/brainstorm/449964-1774164832/guests-page.html"}
+{"type":"screen-added","file":"/home/anirut/DEV/vibe-coding/WiFi_Captive_Portal/.superpowers/brainstorm/449964-1774164832/scenarios-page.html"}
+{"type":"screen-added","file":"/home/anirut/DEV/vibe-coding/WiFi_Captive_Portal/.superpowers/brainstorm/449964-1774164832/failures-page.html"}
+{"type":"screen-added","file":"/home/anirut/DEV/vibe-coding/WiFi_Captive_Portal/.superpowers/brainstorm/449964-1774164832/activity-page.html"}
+{"type":"screen-added","file":"/home/anirut/DEV/vibe-coding/WiFi_Captive_Portal/.superpowers/brainstorm/449964-1774164832/waiting.html"}
+{"type":"server-stopped","reason":"idle timeout"}

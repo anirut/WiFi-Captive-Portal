@@ -1,0 +1,149 @@
+<h2>Failure Rules Page</h2>
+<p class="subtitle">Configure failure injection rules for testing</p>
+
+<div class="mockup">
+  <div class="mockup-header">Failures - FIAS Emulator</div>
+  <div class="mockup-body">
+    <!-- Top Nav -->
+    <div class="mock-nav" style="background: #1e293b; color: #94a3b8; padding: 0.75rem 1rem; display: flex; gap: 1.5rem;">
+      <span style="color: #f8fafc; font-weight: 600;">FIAS Emulator</span>
+      <span>Dashboard</span>
+      <span>Guests</span>
+      <span>Scenarios</span>
+      <span style="color: #38bdf8;">Failures</span>
+      <span>Activity</span>
+    </div>
+
+    <div style="padding: 1rem; display: flex; gap: 1rem;">
+      <!-- Left: Failure Rules List -->
+      <div style="flex: 1;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h3 style="color: #f8fafc; margin: 0;">Failure Rules</h3>
+          <button class="mock-button" style="background: #22c55e;">+ Add Rule</button>
+        </div>
+
+        <!-- Rule Cards -->
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <!-- Rule 1: Drop Connection -->
+          <div style="background: #1e293b; border-radius: 8px; padding: 1rem; border-left: 4px solid #ef4444;">
+            <div style="display: flex; justify-content: space-between;">
+              <div>
+                <div style="color: #f8fafc; font-weight: 500;">Drop Connection on Login</div>
+                <div style="color: #94a3b8; font-size: 0.875rem; margin-top: 0.25rem;">
+                  Trigger: <span style="color: #fbbf24;">on_login</span> |
+                  Action: <span style="color: #f87171;">drop_connection</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="color: #94a3b8; font-size: 0.875rem;">100%</span>
+                <button class="mock-button" style="background: #ef4444; font-size: 0.75rem; padding: 0.25rem 0.5rem;">Trigger</button>
+                <span style="color: #94a3b8; cursor: pointer;">Edit</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rule 2: Delay Response -->
+          <div style="background: #1e293b; border-radius: 8px; padding: 1rem; border-left: 4px solid #f59e0b;">
+            <div style="display: flex; justify-content: space-between;">
+              <div>
+                <div style="color: #f8fafc; font-weight: 500;">Delay Room 101 Queries</div>
+                <div style="color: #94a3b8; font-size: 0.875rem; margin-top: 0.25rem;">
+                  Trigger: <span style="color: #fbbf24;">on_room:101</span> |
+                  Action: <span style="color: #f59e0b;">delay:5s</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="color: #94a3b8; font-size: 0.875rem;">100%</span>
+                <button class="mock-button" style="background: #ef4444; font-size: 0.75rem; padding: 0.25rem 0.5rem;">Trigger</button>
+                <span style="color: #94a3b8; cursor: pointer;">Edit</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rule 3: Malformed XML -->
+          <div style="background: #1e293b; border-radius: 8px; padding: 1rem; border-left: 4px solid #8b5cf6;">
+            <div style="display: flex; justify-content: space-between;">
+              <div>
+                <div style="color: #f8fafc; font-weight: 500;">Malformed XML Response</div>
+                <div style="color: #94a3b8; font-size: 0.875rem; margin-top: 0.25rem;">
+                  Trigger: <span style="color: #fbbf24;">on_query</span> |
+                  Action: <span style="color: #a78bfa;">malformed_xml:missing_field</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="color: #94a3b8; font-size: 0.875rem;">50%</span>
+                <button class="mock-button" style="background: #ef4444; font-size: 0.75rem; padding: 0.25rem 0.5rem;">Trigger</button>
+                <span style="color: #94a3b8; cursor: pointer;">Edit</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rule 4: Login Denied -->
+          <div style="background: #1e293b; border-radius: 8px; padding: 1rem; border-left: 4px solid #ef4444; opacity: 0.6;">
+            <div style="display: flex; justify-content: space-between;">
+              <div>
+                <div style="color: #f8fafc; font-weight: 500;">Login Denied</div>
+                <div style="color: #94a3b8; font-size: 0.875rem; margin-top: 0.25rem;">
+                  Trigger: <span style="color: #fbbf24;">on_login</span> |
+                  Action: <span style="color: #f87171;">login_denied</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="color: #94a3b8; font-size: 0.875rem;">0% (disabled)</span>
+                <button class="mock-button" style="background: #64748b; font-size: 0.75rem; padding: 0.25rem 0.5rem;">Trigger</button>
+                <span style="color: #94a3b8; cursor: pointer;">Edit</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Add/Edit Form -->
+      <div style="width: 320px; background: #1e293b; border-radius: 8px; padding: 1rem;">
+        <h4 style="color: #f8fafc; margin: 0 0 1rem 0;">Add Failure Rule</h4>
+
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.25rem;">Trigger</label>
+          <select style="width: 100%; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; padding: 0.5rem; border-radius: 4px;">
+            <option>on_login</option>
+            <option>on_query</option>
+            <option>on_heartbeat</option>
+            <option>on_logout</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.25rem;">Room Filter (optional)</label>
+          <input class="mock-input" style="width: 100%;" placeholder="e.g., 101 or leave empty">
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.25rem;">Action</label>
+          <select style="width: 100%; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; padding: 0.5rem; border-radius: 4px;">
+            <option>drop_connection</option>
+            <option>delay:1s</option>
+            <option>delay:5s</option>
+            <option>malformed_xml</option>
+            <option>login_denied</option>
+            <option>timeout</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; color: #94a3b8; font-size: 0.75rem; margin-bottom: 0.25rem;">Probability</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="range" style="flex: 1;" min="0" max="100" value="100">
+            <span style="color: #e2e8f0; min-width: 40px;">100%</span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+          <button class="mock-button" style="background: #22c55e; flex: 1;">Save Rule</button>
+          <button class="mock-button" style="background: #64748b; flex: 1;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top: 1rem; color: #94a3b8;">Failure rules list with manual trigger buttons. Right panel shows add/edit form with trigger, action, and probability settings.</p>
