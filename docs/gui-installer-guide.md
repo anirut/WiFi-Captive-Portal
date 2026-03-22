@@ -69,7 +69,7 @@ Internet
 
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone https://github.com/anirut/WiFi-Captive-Portal.git
 cd WiFi_Captive_Portal/installer
 
 # ติดตั้ง dependencies

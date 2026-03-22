@@ -222,7 +222,7 @@ flowchart LR
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/wifi-captive-portal.git
+git clone https://github.com/anirut/WiFi-Captive-Portal.git
 cd wifi-captive-portal
 
 # Run the GUI installer
@@ -240,7 +240,7 @@ The PyQt6 installer provides:
 
 ```bash
 # Clone and enter directory
-git clone https://github.com/your-org/wifi-captive-portal.git
+git clone https://github.com/anirut/WiFi-Captive-Portal.git
 cd wifi-captive-portal
 
 # Run installation script

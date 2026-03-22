@@ -41,7 +41,7 @@
 
 ```bash
 # ตัวอย่าง: clone จาก repository
-git clone https://github.com/your-org/wifi-captive-portal.git /opt/captive-portal
+git clone https://github.com/anirut/WiFi-Captive-Portal.git /opt/captive-portal
 cd /opt/captive-portal
 ```
 

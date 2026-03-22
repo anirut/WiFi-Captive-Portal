@@ -410,7 +410,7 @@ SERVICE_FILE="/etc/systemd/system/captive-portal.service"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
 Description=WiFi Captive Portal
-Documentation=https://github.com/your-org/wifi-captive-portal
+Documentation=https://github.com/anirut/WiFi-Captive-Portal
 After=network.target postgresql.service redis-server.service
 Requires=postgresql.service redis-server.service
 
