@@ -13,10 +13,11 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from emulator.config import settings
 from emulator.database import AsyncSessionFactory, close_db, get_db, init_db
@@ -216,7 +217,7 @@ async def dashboard(request: Request):
 
 
 @app.get("/pages/guests", response_class=HTMLResponse)
-async def guests_page(request: Request, db = get_db):
+async def guests_page(request: Request, db: AsyncSession = Depends(get_db)):
     """Guests management page fragment."""
     try:
         scenarios = (await db.execute(select(Scenario))).scalars().all()
@@ -239,7 +240,7 @@ async def scenarios_page(request: Request):
 
 
 @app.get("/pages/failure-rules", response_class=HTMLResponse)
-async def failure_rules_page(request: Request, db = get_db):
+async def failure_rules_page(request: Request, db: AsyncSession = Depends(get_db)):
     """Failure rules management page fragment."""
     try:
         scenarios = (await db.execute(select(Scenario))).scalars().all()
