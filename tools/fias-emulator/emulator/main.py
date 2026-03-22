@@ -216,12 +216,17 @@ async def dashboard(request: Request):
 
 
 @app.get("/pages/guests", response_class=HTMLResponse)
-async def guests_page(request: Request):
+async def guests_page(request: Request, db = get_db):
     """Guests management page fragment."""
     try:
-        return templates.TemplateResponse("pages/guests.html", {"request": request})
-    except Exception:
-        return HTMLResponse(content="<p>Guests page - templates coming in Task 5</p>")
+        scenarios = (await db.execute(select(Scenario))).scalars().all()
+        return templates.TemplateResponse("pages/guests.html", {
+            "request": request,
+            "scenarios": scenarios,
+        })
+    except Exception as e:
+        logger.error(f"Error rendering guests page: {e}")
+        return HTMLResponse(content="<p>Error loading page</p>", status_code=500)
 
 
 @app.get("/pages/scenarios", response_class=HTMLResponse)
@@ -234,12 +239,17 @@ async def scenarios_page(request: Request):
 
 
 @app.get("/pages/failure-rules", response_class=HTMLResponse)
-async def failure_rules_page(request: Request):
+async def failure_rules_page(request: Request, db = get_db):
     """Failure rules management page fragment."""
     try:
-        return templates.TemplateResponse("pages/failure_rules.html", {"request": request})
-    except Exception:
-        return HTMLResponse(content="<p>Failure rules page - templates coming in Task 5</p>")
+        scenarios = (await db.execute(select(Scenario))).scalars().all()
+        return templates.TemplateResponse("pages/failure_rules.html", {
+            "request": request,
+            "scenarios": scenarios,
+        })
+    except Exception as e:
+        logger.error(f"Error rendering failure rules page: {e}")
+        return HTMLResponse(content="<p>Error loading page</p>", status_code=500)
 
 
 @app.get("/pages/connections", response_class=HTMLResponse)
