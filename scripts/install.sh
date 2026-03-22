@@ -21,7 +21,8 @@ ask()     { echo -e "${YELLOW}[?]${NC} $*"; }
 [[ $EUID -ne 0 ]] && error "This script must be run as root: sudo bash $0"
 
 # ── banner ───────────────────────────────────────────────────────────────────
-clear
+# Only clear if we have a terminal
+if [[ -t 1 ]]; then clear; fi
 echo -e "${BOLD}${BLUE}"
 cat <<'EOF'
  ██╗    ██╗██╗███████╗██╗     ██████╗ ██████╗ ██████╗ ████████╗ █████╗ ██╗
@@ -203,22 +204,37 @@ else
     success "Python $PYTHON_VERSION already installed."
 fi
 
-# ── PostgreSQL ───────────────────────────────────────────────────────────────
+# ── PostgreSQL (latest from official repo) ────────────────────────────────────
 if ! command -v psql &>/dev/null; then
-    info "Installing PostgreSQL..."
-    apt-get install -y -qq postgresql postgresql-contrib
+    info "Installing PostgreSQL 17 from official repo..."
+
+    # Add PostgreSQL official APT repository
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+
+    apt-get update -qq
+    apt-get install -y -qq postgresql-17 postgresql-contrib-17
+
+    # Start PostgreSQL 17
     systemctl enable postgresql
     systemctl start postgresql
-    success "PostgreSQL installed and started."
+    success "PostgreSQL 17 installed and started."
 else
     PG_VER=$(psql --version | awk '{print $3}' | cut -d. -f1)
     success "PostgreSQL $PG_VER already installed."
 fi
 
-# ── Redis ────────────────────────────────────────────────────────────────────
+# ── Redis (latest from official repo) ──────────────────────────────────────────
 if ! command -v redis-server &>/dev/null; then
-    info "Installing Redis..."
-    apt-get install -y -qq redis-server
+    info "Installing Redis latest from official repo..."
+
+    # Add Redis official APT repository
+    curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/redis-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" > /etc/apt/sources.list.d/redis.list
+
+    apt-get update -qq
+    apt-get install -y -qq redis
+
     systemctl enable redis-server
     systemctl start redis-server
     success "Redis installed and started."
@@ -230,6 +246,56 @@ fi
 # SECTION 3: Database Setup
 # =============================================================================
 step "CONFIGURING DATABASE"
+
+# Ensure PostgreSQL is running
+info "Ensuring PostgreSQL is running..."
+systemctl enable postgresql 2>/dev/null || true
+systemctl start postgresql 2>/dev/null || true
+
+# Handle PostgreSQL cluster (Ubuntu/Debian style)
+if command -v pg_ctlcluster &>/dev/null; then
+    # Get cluster info (returns empty if no cluster)
+    PG_INFO=$(pg_lsclusters -h 2>/dev/null)
+
+    if [[ -z "$PG_INFO" ]]; then
+        # No cluster exists, create one
+        PG_VERSION=$(ls /usr/lib/postgresql/ 2>/dev/null | head -1)
+        if [[ -n "$PG_VERSION" ]]; then
+            info "No PostgreSQL cluster found. Creating cluster $PG_VERSION/main..."
+            if ! pg_createcluster "$PG_VERSION" main --start; then
+                error "Failed to create PostgreSQL cluster. Please check PostgreSQL installation."
+            fi
+            success "PostgreSQL cluster $PG_VERSION/main created and started."
+        else
+            error "PostgreSQL installed but no version found in /usr/lib/postgresql/"
+        fi
+    elif echo "$PG_INFO" | grep -q "online"; then
+        info "PostgreSQL cluster already running."
+    else
+        # Cluster exists but is not running, start it
+        PG_CLUSTER=$(echo "$PG_INFO" | head -1 | awk '{print $1"-"$2}')
+        if [[ -n "$PG_CLUSTER" ]]; then
+            info "Starting PostgreSQL cluster $PG_CLUSTER..."
+            pg_ctlcluster "$PG_CLUSTER" start || error "Failed to start PostgreSQL cluster $PG_CLUSTER"
+            success "PostgreSQL cluster $PG_CLUSTER started."
+        fi
+    fi
+fi
+
+# Wait for PostgreSQL to be ready
+for i in {1..10}; do
+    if sudo -u postgres psql -c "SELECT 1" >/dev/null 2>&1; then
+        success "PostgreSQL is ready."
+        break
+    fi
+    info "Waiting for PostgreSQL to start... ($i/10)"
+    sleep 1
+done
+
+# Verify PostgreSQL is accessible
+if ! sudo -u postgres psql -c "SELECT 1" >/dev/null 2>&1; then
+    error "PostgreSQL is not running. Please check 'systemctl status postgresql' and 'pg_lsclusters'"
+fi
 
 DB_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 2>/dev/null || echo "")
 USER_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" 2>/dev/null || echo "")
@@ -336,8 +402,37 @@ success ".env written to $ENV_FILE"
 step "RUNNING DATABASE MIGRATIONS"
 
 cd "$APP_DIR"
-info "Running Alembic migrations..."
-"$VENV_DIR/bin/alembic" upgrade head
+
+# Check if migrations can run, if not create base tables first
+info "Checking database migration status..."
+if ! "$VENV_DIR/bin/alembic" current 2>/dev/null | grep -q "c3d4e5f6"; then
+    info "Running Alembic migrations..."
+    if ! "$VENV_DIR/bin/alembic" upgrade head 2>/dev/null; then
+        warn "Migration failed, creating base tables first..."
+        "$VENV_DIR/bin/python" << 'PYEOF'
+import os, sys
+sys.path.insert(0, os.getcwd())
+os.chdir(os.getcwd())
+
+from sqlalchemy import create_engine
+from app.core.config import settings
+from app.core.database import Base
+from app.core import models  # noqa: F401 — registers all models
+
+# Convert async URL to sync URL for table creation
+sync_url = settings.DATABASE_URL.replace("+asyncpg", "")
+engine = create_engine(sync_url)
+Base.metadata.create_all(bind=engine)
+print("Base tables created successfully!")
+PYEOF
+
+        # Now stamp the migration as complete
+        info "Stamping migration as complete..."
+        "$VENV_DIR/bin/alembic" stamp head
+    fi
+else
+    info "Database already at latest migration."
+fi
 
 success "Database schema up to date."
 
@@ -420,7 +515,7 @@ User=root
 Group=root
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$ENV_FILE
-ExecStartPre=$SCRIPT_DIR/setup-nftables.sh
+ExecStartPre=$SCRIPT_DIR/setup-nftables.sh --wifi $WIFI_INTERFACE --wan $WAN_INTERFACE --portal-ip $PORTAL_IP --portal-port $PORTAL_PORT --dns-ip ${DNS_UPSTREAM_IP:-8.8.8.8}
 ExecStart=$VENV_DIR/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORTAL_PORT --workers 1
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=on-failure

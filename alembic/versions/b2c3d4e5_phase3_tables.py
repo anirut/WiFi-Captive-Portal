@@ -19,9 +19,11 @@ BRAND_CONFIG_ID = '00000000-0000-0000-0000-000000000001'
 
 
 def upgrade() -> None:
-    # 1. language_type enum
-    language_type = postgresql.ENUM('th', 'en', name='languagetype', create_type=True)
-    language_type.create(op.get_bind(), checkfirst=True)
+    # 1. language_type enum - check if exists first
+    conn = op.get_bind()
+    if not conn.dialect.has_type(conn, 'languagetype'):
+        language_type = postgresql.ENUM('th', 'en', name='languagetype', create_type=True)
+        language_type.create(op.get_bind(), checkfirst=True)
 
     # 2. usage_snapshots
     op.create_table(

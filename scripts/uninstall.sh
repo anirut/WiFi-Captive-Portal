@@ -69,6 +69,15 @@ read -r RM_NETWORK; RM_NETWORK="${RM_NETWORK:-Y}"
 ask "Drop database '${DB_NAME}' and user '${DB_USER}'? [y/N]:"
 read -r RM_DB; RM_DB="${RM_DB:-N}"
 
+ask "Remove PostgreSQL 17 (from pgdg repo)? [y/N]:"
+read -r RM_POSTGRES; RM_POSTGRES="${RM_POSTGRES:-N}"
+
+ask "Remove Redis (from redis.io repo)? [y/N]:"
+read -r RM_REDIS; RM_REDIS="${RM_REDIS:-N}"
+
+ask "Remove system dependencies (iptables-persistent, dnsmasq, etc.)? [y/N]:"
+read -r RM_DEPS; RM_DEPS="${RM_DEPS:-N}"
+
 ask "Remove virtual environment (.venv)? [y/N]:"
 read -r RM_VENV; RM_VENV="${RM_VENV:-N}"
 
@@ -152,6 +161,143 @@ if [[ "${RM_DB:-N}" =~ ^[Yy]$ ]]; then
     else
         warn "psql not found — skipping database removal."
     fi
+fi
+
+# =============================================================================
+step "REMOVING POSTGRESQL"
+# =============================================================================
+
+if [[ "${RM_POSTGRES:-N}" =~ ^[Yy]$ ]]; then
+    if command -v psql &>/dev/null; then
+        info "Stopping PostgreSQL service..."
+        systemctl stop postgresql 2>/dev/null || true
+        systemctl disable postgresql 2>/dev/null || true
+
+        info "Removing PostgreSQL packages..."
+        apt-get remove -y -qq \
+            postgresql-17 postgresql-contrib-17 postgresql-client-17 \
+            postgresql-common postgresql-client-common \
+            2>/dev/null || true
+
+        info "Purging PostgreSQL packages..."
+        apt-get purge -y -qq \
+            postgresql-17 postgresql-contrib-17 postgresql-client-17 \
+            postgresql-common postgresql-client-common \
+            2>/dev/null || true
+
+        # Remove PostgreSQL data directory
+        if [[ -d /var/lib/postgresql ]]; then
+            info "Removing PostgreSQL data directory..."
+            rm -rf /var/lib/postgresql
+        fi
+
+        # Remove PostgreSQL config directory
+        if [[ -d /etc/postgresql ]]; then
+            info "Removing PostgreSQL config directory..."
+            rm -rf /etc/postgresql
+        fi
+
+        # Remove pgdg repo list
+        if [[ -f /etc/apt/sources.list.d/pgdg.list ]]; then
+            info "Removing PostgreSQL APT repository..."
+            rm -f /etc/apt/sources.list.d/pgdg.list
+        fi
+
+        # Remove pgdg GPG keyring
+        if [[ -f /usr/share/keyrings/postgresql-keyring.gpg ]]; then
+            rm -f /usr/share/keyrings/postgresql-keyring.gpg
+        fi
+
+        apt-get update -qq
+        success "PostgreSQL removed."
+    else
+        info "PostgreSQL not found — skipping."
+    fi
+fi
+
+# =============================================================================
+step "REMOVING REDIS"
+# =============================================================================
+
+if [[ "${RM_REDIS:-N}" =~ ^[Yy]$ ]]; then
+    if command -v redis-server &>/dev/null || [[ -f /etc/apt/sources.list.d/redis.list ]]; then
+        info "Stopping Redis service..."
+        systemctl stop redis-server 2>/dev/null || true
+        systemctl disable redis-server 2>/dev/null || true
+
+        info "Removing Redis packages..."
+        apt-get remove -y -qq redis redis-server redis-tools 2>/dev/null || true
+
+        info "Purging Redis packages..."
+        apt-get purge -y -qq redis redis-server redis-tools 2>/dev/null || true
+
+        # Remove Redis data directory
+        if [[ -d /var/lib/redis ]]; then
+            info "Removing Redis data directory..."
+            rm -rf /var/lib/redis
+        fi
+
+        # Remove Redis config
+        if [[ -d /etc/redis ]]; then
+            info "Removing Redis config directory..."
+            rm -rf /etc/redis
+        fi
+
+        # Remove Redis repo list
+        if [[ -f /etc/apt/sources.list.d/redis.list ]]; then
+            info "Removing Redis APT repository..."
+            rm -f /etc/apt/sources.list.d/redis.list
+        fi
+
+        # Remove Redis GPG keyring
+        if [[ -f /usr/share/keyrings/redis-keyring.gpg ]]; then
+            rm -f /usr/share/keyrings/redis-keyring.gpg
+        fi
+
+        apt-get update -qq
+        success "Redis removed."
+    else
+        info "Redis not found — skipping."
+    fi
+fi
+
+# =============================================================================
+step "REMOVING SYSTEM DEPENDENCIES"
+# =============================================================================
+
+if [[ "${RM_DEPS:-N}" =~ ^[Yy]$ ]]; then
+    info "Removing system dependencies..."
+
+    # Remove dnsmasq if installed
+    if command -v dnsmasq &>/dev/null; then
+        info "Removing dnsmasq..."
+        apt-get remove -y -qq dnsmasq 2>/dev/null || true
+        apt-get purge -y -qq dnsmasq 2>/dev/null || true
+        # Remove dnsmasq config
+        rm -f /etc/dnsmasq.d/captive-portal.conf 2>/dev/null || true
+    fi
+
+    # Remove iptables-persistent and netfilter-persistent
+    info "Removing iptables-persistent..."
+    apt-get remove -y -qq iptables-persistent netfilter-persistent 2>/dev/null || true
+    apt-get purge -y -qq iptables-persistent netfilter-persistent 2>/dev/null || true
+
+    # Clean up iptables rules file
+    rm -f /etc/iptables/rules.v4 2>/dev/null || true
+    rm -f /etc/iptables/rules.v6 2>/dev/null || true
+
+    # Remove deadsnakes PPA if we added it (for Python 3.12)
+    if [[ -f /etc/apt/sources.list.d/deadsnakes-ubuntu-ppa-*.list ]]; then
+        info "Removing deadsnakes PPA..."
+        rm -f /etc/apt/sources.list.d/deadsnakes-ubuntu-ppa-*.list
+    fi
+
+    # Autoremove unused packages
+    info "Running apt autoremove..."
+    apt-get autoremove -y -qq 2>/dev/null || true
+
+    apt-get update -qq
+    success "System dependencies removed."
 fi
 
 # =============================================================================
