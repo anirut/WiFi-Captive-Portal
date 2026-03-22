@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block title %}Guests{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+  <h2 class="text-2xl font-semibold text-white">Test Guests</h2>
+  <button
+    id="add-guest-btn"
+    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+    Add Guest
+  </button>
+</div>
+
+<!-- Add Guest Form (Hidden by default) -->
+<div id="add-guest-form" class="glass rounded-xl p-6 mb-6 hidden">
+  <h3 class="text-lg font-semibold text-white mb-4">Add New Guest</h3>
+  <form id="new-guest-form" class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Room Number</label>
+      <input type="text" name="room_number" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm" placeholder="101"/>
+    </div>
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Reservation Number</label>
+      <input type="text" name="reservation_number" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm" placeholder="R12345"/>
+    </div>
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Last Name</label>
+      <input type="text" name="last_name" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm" placeholder="Smith"/>
+    </div>
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">First Name</label>
+      <input type="text" name="first_name" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm" placeholder="John"/>
+    </div>
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Arrival Date</label>
+      <input type="date" name="arrival_date" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"/>
+    </div>
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Departure Date</label>
+      <input type="date" name="departure_date" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"/>
+    </div>
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Scenario</label>
+      <select name="scenario_id" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm">
+        <option value="">None</option>
+        {% for scenario in scenarios %}
+        <option value="{{ scenario.id }}">{{ scenario.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex items-end gap-2">
+      <label class="flex items-center gap-2 text-slate-400 text-sm">
+        <input type="checkbox" name="is_active" checked class="rounded bg-white/5 border-white/10"/>
+        Active
+      </label>
+    </div>
+    <div class="col-span-2 flex gap-2 mt-2">
+      <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+        Save Guest
+      </button>
+      <button type="button" id="cancel-add-guest" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium transition-colors">
+        Cancel
+      </button>
+    </div>
+  </form>
+  <div id="form-result" class="mt-4 text-sm"></div>
+</div>
+
+<!-- Guests Table -->
+<div class="glass rounded-xl p-6">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-slate-300">
+      <thead>
+        <tr class="text-slate-500 border-b border-white/10">
+          <th class="pb-2 text-left">Room</th>
+          <th class="pb-2 text-left">Name</th>
+          <th class="pb-2 text-left">Reservation</th>
+          <th class="pb-2 text-left">Arrival</th>
+          <th class="pb-2 text-left">Departure</th>
+          <th class="pb-2 text-left">Status</th>
+          <th class="pb-2 text-left">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="guests-tbody">
+        <tr>
+          <td colspan="7" class="py-8 text-center text-slate-500">
+            Loading...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Edit Guest Modal -->
+<div id="edit-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+  <div class="glass rounded-xl p-6 w-full max-w-lg mx-4">
+    <h3 class="text-lg font-semibold text-white mb-4">Edit Guest</h3>
+    <form id="edit-guest-form" class="grid grid-cols-2 gap-4">
+      <input type="hidden" name="id" id="edit-id"/>
+      <div>
+        <label class="block text-slate-400 text-sm mb-1">Room Number</label>
+        <input type="text" name="room_number" id="edit-room" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"/>
+      </div>
+      <div>
+        <label class="block text-slate-400 text-sm mb-1">Reservation Number</label>
+        <input type="text" name="reservation_number" id="edit-reservation" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"/>
+      </div>
+      <div>
+        <label class="block text-slate-400 text-sm mb-1">Last Name</label>
+        <input type="text" name="last_name" id="edit-last-name" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"/>
+      </div>
+      <div>
+        <label class="block text-slate-400 text-sm mb-1">First Name</label>
+        <input type="text" name="first_name" id="edit-first-name" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"/>
+      </div>
+      <div>
+        <label class="block text-slate-400 text-sm mb-1">Arrival Date</label>
+        <input type="date" name="arrival_date" id="edit-arrival" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"/>
+      </div>
+      <div>
+        <label class="block text-slate-400 text-sm mb-1">Departure Date</label>
+        <input type="date" name="departure_date" id="edit-departure" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"/>
+      </div>
+      <div class="col-span-2">
+        <label class="flex items-center gap-2 text-slate-400 text-sm">
+          <input type="checkbox" name="is_active" id="edit-active" class="rounded bg-white/5 border-white/10"/>
+          Active
+        </label>
+      </div>
+      <div class="col-span-2 flex gap-2 mt-2">
+        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+          Update Guest
+        </button>
+        <button type="button" id="cancel-edit" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium transition-colors">
+          Cancel
+        </button>
+      </div>
+    </form>
+    <div id="edit-result" class="mt-4 text-sm"></div>
+  </div>
+</div>
+
+<script>
+  // Toggle add guest form
+  document.getElementById('add-guest-btn').addEventListener('click', function() {
+    const form = document.getElementById('add-guest-form');
+    form.classList.toggle('hidden');
+  });
+
+  document.getElementById('cancel-add-guest').addEventListener('click', function() {
+    document.getElementById('add-guest-form').classList.add('hidden');
+    document.getElementById('new-guest-form').reset();
+  });
+
+  // Helper function for safe text display
+  function setText(elementId, text) {
+    const el = document.getElementById(elementId);
+    if (el) el.textContent = text || '';
+  }
+
+  // Helper function to show result messages safely
+  function showResult(elementId, message, isError) {
+    const el = document.getElementById(elementId);
+    if (el) {
+      el.textContent = message;
+      el.className = isError ? 'mt-4 text-sm text-red-400' : 'mt-4 text-sm text-green-400';
+    }
+  }
+
+  // Add guest form submission
+  document.getElementById('new-guest-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const data = {
+      room_number: formData.get('room_number'),
+      reservation_number: formData.get('reservation_number'),
+      last_name: formData.get('last_name'),
+      first_name: formData.get('first_name') || null,
+      arrival_date: formData.get('arrival_date'),
+      departure_date: formData.get('departure_date'),
+      is_active: formData.get('is_active') === 'on',
+      scenario_id: formData.get('scenario_id') ? parseInt(formData.get('scenario_id')) : null
+    };
+
+    fetch('/api/guests', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+      if (result.id) {
+        showResult('form-result', 'Guest added successfully!', false);
+        document.getElementById('new-guest-form').reset();
+        document.getElementById('add-guest-form').classList.add('hidden');
+        loadGuests();
+      } else {
+        showResult('form-result', 'Error: ' + (result.error?.error || JSON.stringify(result)), true);
+      }
+    })
+    .catch(err => {
+      showResult('form-result', 'Error: ' + String(err), true);
+    });
+  });
+
+  // Load guests using safe DOM methods
+  function loadGuests() {
+    fetch('/api/guests')
+      .then(r => r.json())
+      .then(guests => {
+        const tbody = document.getElementById('guests-tbody');
+        tbody.innerHTML = '';
+        if (guests.length === 0) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 7;
+          td.className = 'py-8 text-center text-slate-500';
+          td.textContent = 'No guests found. Add a test guest to get started.';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+        guests.forEach(guest => {
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-white/5 hover:bg-white/5';
+
+          // Room
+          const tdRoom = document.createElement('td');
+          tdRoom.className = 'py-3 font-mono';
+          tdRoom.textContent = guest.room_number;
+          tr.appendChild(tdRoom);
+
+          // Name
+          const tdName = document.createElement('td');
+          tdName.className = 'py-3';
+          tdName.textContent = guest.last_name + ', ' + (guest.first_name || '');
+          tr.appendChild(tdName);
+
+          // Reservation
+          const tdRes = document.createElement('td');
+          tdRes.className = 'py-3 font-mono';
+          tdRes.textContent = guest.reservation_number;
+          tr.appendChild(tdRes);
+
+          // Arrival
+          const tdArr = document.createElement('td');
+          tdArr.className = 'py-3';
+          tdArr.textContent = guest.arrival_date;
+          tr.appendChild(tdArr);
+
+          // Departure
+          const tdDep = document.createElement('td');
+          tdDep.className = 'py-3';
+          tdDep.textContent = guest.departure_date;
+          tr.appendChild(tdDep);
+
+          // Status
+          const tdStatus = document.createElement('td');
+          tdStatus.className = 'py-3';
+          const statusSpan = document.createElement('span');
+          statusSpan.className = guest.is_active
+            ? 'px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-300'
+            : 'px-2 py-0.5 rounded text-xs bg-slate-500/20 text-slate-300';
+          statusSpan.textContent = guest.is_active ? 'Active' : 'Inactive';
+          tdStatus.appendChild(statusSpan);
+          tr.appendChild(tdStatus);
+
+          // Actions
+          const tdActions = document.createElement('td');
+          tdActions.className = 'py-3';
+
+          const editBtn = document.createElement('button');
+          editBtn.className = 'text-indigo-400 hover:text-indigo-300 mr-2';
+          editBtn.textContent = 'Edit';
+          editBtn.onclick = function() { editGuest(guest.id); };
+          tdActions.appendChild(editBtn);
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'text-red-400 hover:text-red-300';
+          deleteBtn.textContent = 'Delete';
+          deleteBtn.onclick = function() { deleteGuest(guest.id); };
+          tdActions.appendChild(deleteBtn);
+
+          tr.appendChild(tdActions);
+          tbody.appendChild(tr);
+        });
+      });
+  }
+
+  // Edit guest
+  function editGuest(id) {
+    fetch('/api/guests/' + id)
+      .then(r => r.json())
+      .then(guest => {
+        document.getElementById('edit-id').value = guest.id;
+        document.getElementById('edit-room').value = guest.room_number;
+        document.getElementById('edit-reservation').value = guest.reservation_number;
+        document.getElementById('edit-last-name').value = guest.last_name;
+        document.getElementById('edit-first-name').value = guest.first_name || '';
+        document.getElementById('edit-arrival').value = guest.arrival_date;
+        document.getElementById('edit-departure').value = guest.departure_date;
+        document.getElementById('edit-active').checked = guest.is_active;
+        document.getElementById('edit-modal').classList.remove('hidden');
+        document.getElementById('edit-modal').classList.add('flex');
+      });
+  }
+
+  // Edit form submission
+  document.getElementById('edit-guest-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const id = formData.get('id');
+    const data = {
+      room_number: formData.get('room_number'),
+      reservation_number: formData.get('reservation_number'),
+      last_name: formData.get('last_name'),
+      first_name: formData.get('first_name') || null,
+      arrival_date: formData.get('arrival_date'),
+      departure_date: formData.get('departure_date'),
+      is_active: formData.get('is_active') === 'on'
+    };
+
+    fetch('/api/guests/' + id, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+      if (result.id) {
+        showResult('edit-result', 'Guest updated successfully!', false);
+        closeEditModal();
+        loadGuests();
+      } else {
+        showResult('edit-result', 'Error: ' + (result.error?.error || JSON.stringify(result)), true);
+      }
+    })
+    .catch(err => {
+      showResult('edit-result', 'Error: ' + String(err), true);
+    });
+  });
+
+  // Close edit modal
+  function closeEditModal() {
+    document.getElementById('edit-modal').classList.add('hidden');
+    document.getElementById('edit-modal').classList.remove('flex');
+    document.getElementById('edit-guest-form').reset();
+  }
+
+  document.getElementById('cancel-edit').addEventListener('click', closeEditModal);
+
+  // Delete guest
+  function deleteGuest(id) {
+    if (!confirm('Are you sure you want to delete this guest?')) return;
+
+    fetch('/api/guests/' + id, {method: 'DELETE'})
+      .then(r => r.json())
+      .then(() => loadGuests())
+      .catch(err => alert('Error: ' + err));
+  }
+
+  // Initial load
+  loadGuests();
+</script>
+{% endblock %}

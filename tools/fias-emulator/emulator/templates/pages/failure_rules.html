@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}Failure Rules{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+  <h2 class="text-2xl font-semibold text-white">Failure Injection Rules</h2>
+  <button
+    id="add-rule-btn"
+    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+    Add Rule
+  </button>
+</div>
+
+<!-- Add Rule Form (Hidden by default) -->
+<div id="add-rule-form" class="glass rounded-xl p-6 mb-6 hidden">
+  <h3 class="text-lg font-semibold text-white mb-4">Add New Failure Rule</h3>
+  <form id="new-rule-form" class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Trigger</label>
+      <select name="trigger" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm">
+        <option value="on_login">On Login (LR)</option>
+        <option value="on_query">On Query (GIQ)</option>
+        <option value="on_heartbeat">On Heartbeat (KA)</option>
+        <option value="on_room:101">On Room 101 Query</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Action</label>
+      <select name="action" id="rule-action" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm">
+        <option value="drop_connection">Drop Connection</option>
+        <option value="login_denied">Login Denied</option>
+        <option value="timeout">Timeout (no response)</option>
+        <option value="delay:5s">Delay 5 seconds</option>
+        <option value="malformed_xml">Malformed XML</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Probability (0.0 - 1.0)</label>
+      <input type="number" name="probability" step="0.1" min="0" max="1" value="1.0" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"/>
+    </div>
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Malformed Type (if applicable)</label>
+      <select name="malformed_type" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm">
+        <option value="">None</option>
+        <option value="missing_field">Missing Field</option>
+        <option value="bad_encoding">Bad Encoding</option>
+        <option value="unknown_tag">Unknown Tag</option>
+        <option value="truncated">Truncated</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-slate-400 text-sm mb-1">Scenario (optional)</label>
+      <select name="scenario_id" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm">
+        <option value="">Global (all scenarios)</option>
+        {% for scenario in scenarios %}
+        <option value="{{ scenario.id }}">{{ scenario.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-span-2 flex gap-2 mt-2">
+      <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+        Save Rule
+      </button>
+      <button type="button" id="cancel-add-rule" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium transition-colors">
+        Cancel
+      </button>
+    </div>
+  </form>
+  <div id="form-result" class="mt-4 text-sm"></div>
+</div>
+
+<!-- Failure Rules Table -->
+<div class="glass rounded-xl p-6">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-slate-300">
+      <thead>
+        <tr class="text-slate-500 border-b border-white/10">
+          <th class="pb-2 text-left">ID</th>
+          <th class="pb-2 text-left">Trigger</th>
+          <th class="pb-2 text-left">Action</th>
+          <th class="pb-2 text-left">Probability</th>
+          <th class="pb-2 text-left">Scenario</th>
+          <th class="pb-2 text-left">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rules-tbody">
+        <tr>
+          <td colspan="6" class="py-8 text-center text-slate-500">
+            Loading...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  // Toggle add rule form
+  document.getElementById('add-rule-btn').addEventListener('click', function() {
+    const form = document.getElementById('add-rule-form');
+    form.classList.toggle('hidden');
+  });
+
+  document.getElementById('cancel-add-rule').addEventListener('click', function() {
+    document.getElementById('add-rule-form').classList.add('hidden');
+    document.getElementById('new-rule-form').reset();
+  });
+
+  // Show result message safely
+  function showResult(elementId, message, isError) {
+    const el = document.getElementById(elementId);
+    if (el) {
+      el.textContent = message;
+      el.className = isError ? 'mt-4 text-sm text-red-400' : 'mt-4 text-sm text-green-400';
+    }
+  }
+
+  // Add rule form submission
+  document.getElementById('new-rule-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const data = {
+      trigger: formData.get('trigger'),
+      action: formData.get('action'),
+      probability: parseFloat(formData.get('probability')),
+      malformed_type: formData.get('malformed_type') || null,
+      scenario_id: formData.get('scenario_id') ? parseInt(formData.get('scenario_id')) : null
+    };
+
+    fetch('/api/failure-rules', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(function(result) {
+      if (result.id) {
+        showResult('form-result', 'Rule added successfully!', false);
+        document.getElementById('new-rule-form').reset();
+        document.getElementById('add-rule-form').classList.add('hidden');
+        loadRules();
+      } else {
+        showResult('form-result', 'Error: ' + (result.error?.error || JSON.stringify(result)), true);
+      }
+    })
+    .catch(function(err) {
+      showResult('form-result', 'Error: ' + String(err), true);
+    });
+  });
+
+  // Load rules using safe DOM methods
+  function loadRules() {
+    fetch('/api/failure-rules')
+      .then(r => r.json())
+      .then(function(rules) {
+        const tbody = document.getElementById('rules-tbody');
+        while (tbody.firstChild) {
+          tbody.removeChild(tbody.firstChild);
+        }
+
+        if (rules.length === 0) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 6;
+          td.className = 'py-8 text-center text-slate-500';
+          td.textContent = 'No failure rules configured. Add a rule to simulate PMS failures.';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+
+        rules.forEach(function(rule) {
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-white/5 hover:bg-white/5';
+
+          // ID
+          const tdId = document.createElement('td');
+          tdId.className = 'py-3 font-mono';
+          tdId.textContent = rule.id;
+          tr.appendChild(tdId);
+
+          // Trigger
+          const tdTrigger = document.createElement('td');
+          tdTrigger.className = 'py-3';
+          const triggerBadge = document.createElement('span');
+          triggerBadge.className = 'px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-300 font-mono';
+          triggerBadge.textContent = rule.trigger;
+          tdTrigger.appendChild(triggerBadge);
+          tr.appendChild(tdTrigger);
+
+          // Action
+          const tdAction = document.createElement('td');
+          tdAction.className = 'py-3';
+          const actionBadge = document.createElement('span');
+          actionBadge.className = 'px-2 py-0.5 rounded text-xs bg-orange-500/20 text-orange-300 font-mono';
+          actionBadge.textContent = rule.action;
+          tdAction.appendChild(actionBadge);
+          tr.appendChild(tdAction);
+
+          // Probability
+          const tdProb = document.createElement('td');
+          tdProb.className = 'py-3';
+          tdProb.textContent = (rule.probability * 100).toFixed(0) + '%';
+          tr.appendChild(tdProb);
+
+          // Scenario
+          const tdScenario = document.createElement('td');
+          tdScenario.className = 'py-3';
+          tdScenario.textContent = rule.scenario_id ? 'Scenario ' + rule.scenario_id : 'Global';
+          tr.appendChild(tdScenario);
+
+          // Actions
+          const tdActions = document.createElement('td');
+          tdActions.className = 'py-3';
+
+          const triggerBtn = document.createElement('button');
+          triggerBtn.className = 'text-yellow-400 hover:text-yellow-300 mr-2';
+          triggerBtn.textContent = 'Trigger';
+          triggerBtn.dataset.ruleId = rule.id;
+          triggerBtn.addEventListener('click', function() {
+            triggerRule(parseInt(this.dataset.ruleId));
+          });
+          tdActions.appendChild(triggerBtn);
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'text-red-400 hover:text-red-300';
+          deleteBtn.textContent = 'Delete';
+          deleteBtn.dataset.ruleId = rule.id;
+          deleteBtn.addEventListener('click', function() {
+            deleteRule(parseInt(this.dataset.ruleId));
+          });
+          tdActions.appendChild(deleteBtn);
+
+          tr.appendChild(tdActions);
+          tbody.appendChild(tr);
+        });
+      });
+  }
+
+  // Trigger rule manually
+  function triggerRule(id) {
+    fetch('/api/failure-rules/' + id + '/trigger', {method: 'POST'})
+      .then(r => r.json())
+      .then(function(result) {
+        if (result.message) {
+          alert('Rule triggered: ' + result.rule.action);
+        } else {
+          alert('Error: ' + JSON.stringify(result));
+        }
+      })
+      .catch(function(err) { alert('Error: ' + err); });
+  }
+
+  // Delete rule
+  function deleteRule(id) {
+    if (!confirm('Are you sure you want to delete this rule?')) return;
+
+    fetch('/api/failure-rules/' + id, {method: 'DELETE'})
+      .then(r => r.json())
+      .then(function() { loadRules(); })
+      .catch(function(err) { alert('Error: ' + err); });
+  }
+
+  // Initial load
+  loadRules();
+</script>
+{% endblock %}

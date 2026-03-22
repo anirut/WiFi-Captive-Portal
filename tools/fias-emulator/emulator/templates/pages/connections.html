@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Connections{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+  <h2 class="text-2xl font-semibold text-white">FIAS Connections</h2>
+  <div class="flex gap-2">
+    <button
+      id="filter-all"
+      class="px-3 py-1 bg-white/10 text-white rounded-lg text-sm font-medium transition-colors">
+      All
+    </button>
+    <button
+      id="filter-active"
+      class="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium transition-colors">
+      Active Only
+    </button>
+  </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-3 gap-6 mb-8">
+  <div class="glass rounded-xl p-6">
+    <p class="text-slate-400 text-sm">Total Connections</p>
+    <p id="total-count" class="text-3xl font-bold text-white mt-1">0</p>
+  </div>
+  <div class="glass rounded-xl p-6">
+    <p class="text-slate-400 text-sm">Active Connections</p>
+    <p id="active-count" class="text-3xl font-bold text-green-400 mt-1">0</p>
+  </div>
+  <div class="glass rounded-xl p-6">
+    <p class="text-slate-400 text-sm">Unique Clients</p>
+    <p id="unique-clients" class="text-3xl font-bold text-indigo-400 mt-1">0</p>
+  </div>
+</div>
+
+<!-- Connections Table -->
+<div class="glass rounded-xl p-6">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-slate-300">
+      <thead>
+        <tr class="text-slate-500 border-b border-white/10">
+          <th class="pb-2 text-left">ID</th>
+          <th class="pb-2 text-left">Client</th>
+          <th class="pb-2 text-left">Connected At</th>
+          <th class="pb-2 text-left">Vendor ID</th>
+          <th class="pb-2 text-left">Status</th>
+        </tr>
+      </thead>
+      <tbody id="connections-tbody">
+        <tr>
+          <td colspan="5" class="py-8 text-center text-slate-500">
+            Loading...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  let currentFilter = 'all';
+
+  // Filter buttons
+  document.getElementById('filter-all').addEventListener('click', function() {
+    currentFilter = 'all';
+    document.getElementById('filter-all').className = 'px-3 py-1 bg-white/10 text-white rounded-lg text-sm font-medium transition-colors';
+    document.getElementById('filter-active').className = 'px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium transition-colors';
+    loadConnections();
+  });
+
+  document.getElementById('filter-active').addEventListener('click', function() {
+    currentFilter = 'active';
+    document.getElementById('filter-active').className = 'px-3 py-1 bg-white/10 text-white rounded-lg text-sm font-medium transition-colors';
+    document.getElementById('filter-all').className = 'px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium transition-colors';
+    loadConnections();
+  });
+
+  // Load connections using safe DOM methods
+  function loadConnections() {
+    const url = currentFilter === 'active' ? '/api/connections?is_active=true' : '/api/connections';
+
+    fetch(url)
+      .then(r => r.json())
+      .then(function(connections) {
+        const tbody = document.getElementById('connections-tbody');
+        while (tbody.firstChild) {
+          tbody.removeChild(tbody.firstChild);
+        }
+
+        // Update stats
+        document.getElementById('total-count').textContent = connections.length;
+        const activeCount = connections.filter(function(c) { return c.is_active; }).length;
+        document.getElementById('active-count').textContent = activeCount;
+
+        const uniqueClients = new Set(connections.map(function(c) { return c.client_host; })).size;
+        document.getElementById('unique-clients').textContent = uniqueClients;
+
+        if (connections.length === 0) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 5;
+          td.className = 'py-8 text-center text-slate-500';
+          td.textContent = 'No connections yet. Connect a FIAS client to see activity.';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+
+        connections.forEach(function(conn) {
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-white/5 hover:bg-white/5';
+
+          // ID
+          const tdId = document.createElement('td');
+          tdId.className = 'py-3 font-mono';
+          tdId.textContent = conn.id;
+          tr.appendChild(tdId);
+
+          // Client
+          const tdClient = document.createElement('td');
+          tdClient.className = 'py-3';
+          tdClient.textContent = conn.client_host + ':' + conn.client_port;
+          tr.appendChild(tdClient);
+
+          // Connected At
+          const tdTime = document.createElement('td');
+          tdTime.className = 'py-3';
+          tdTime.textContent = new Date(conn.connected_at).toLocaleString();
+          tr.appendChild(tdTime);
+
+          // Vendor ID
+          const tdVendor = document.createElement('td');
+          tdVendor.className = 'py-3 font-mono';
+          tdVendor.textContent = conn.vendor_id || '-';
+          tr.appendChild(tdVendor);
+
+          // Status
+          const tdStatus = document.createElement('td');
+          tdStatus.className = 'py-3';
+          const statusBadge = document.createElement('span');
+          statusBadge.className = conn.is_active
+            ? 'px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-300'
+            : 'px-2 py-0.5 rounded text-xs bg-slate-500/20 text-slate-300';
+          statusBadge.textContent = conn.is_active ? 'Active' : 'Closed';
+          tdStatus.appendChild(statusBadge);
+          tr.appendChild(tdStatus);
+
+          tbody.appendChild(tr);
+        });
+      });
+  }
+
+  // Initial load
+  loadConnections();
+
+  // Auto-refresh every 5 seconds
+  setInterval(loadConnections, 5000);
+</script>
+{% endblock %}

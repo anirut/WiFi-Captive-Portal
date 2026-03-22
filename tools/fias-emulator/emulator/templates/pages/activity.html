@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Activity Log{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+  <h2 class="text-2xl font-semibold text-white">Activity Log</h2>
+  <div class="flex gap-2">
+    <select id="filter-direction" class="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white">
+      <option value="">All Directions</option>
+      <option value="in">Incoming</option>
+      <option value="out">Outgoing</option>
+    </select>
+    <select id="filter-type" class="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white">
+      <option value="">All Types</option>
+      <option value="LR">LR (Login Request)</option>
+      <option value="LA">LA (Login Ack)</option>
+      <option value="GIQ">GIQ (Guest Info Query)</option>
+      <option value="GI">GI (Guest Info)</option>
+      <option value="KA">KA (Keep Alive)</option>
+      <option value="KR">KR (Keep Alive Response)</option>
+      <option value="LD">LD (Logout)</option>
+    </select>
+    <button
+      id="export-btn"
+      class="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium transition-colors">
+      Export CSV
+    </button>
+  </div>
+</div>
+
+<!-- Activity Table -->
+<div class="glass rounded-xl p-6">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-slate-300">
+      <thead>
+        <tr class="text-slate-500 border-b border-white/10">
+          <th class="pb-2 text-left w-40">Timestamp</th>
+          <th class="pb-2 text-left w-16">Dir</th>
+          <th class="pb-2 text-left w-20">Type</th>
+          <th class="pb-2 text-left">Content</th>
+          <th class="pb-2 text-left w-20">Conn ID</th>
+        </tr>
+      </thead>
+      <tbody id="activity-tbody">
+        <tr>
+          <td colspan="5" class="py-8 text-center text-slate-500">
+            Loading...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="flex justify-between items-center mt-4 pt-4 border-t border-white/10">
+    <p id="activity-count" class="text-slate-500 text-sm">0 entries</p>
+    <div class="flex gap-2">
+      <button
+        id="load-more-btn"
+        class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium transition-colors">
+        Load More
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let activities = [];
+  let currentLimit = 100;
+
+  // Filter handlers
+  document.getElementById('filter-direction').addEventListener('change', loadActivities);
+  document.getElementById('filter-type').addEventListener('change', loadActivities);
+
+  // Export CSV
+  document.getElementById('export-btn').addEventListener('click', function() {
+    const direction = document.getElementById('filter-direction').value;
+    const type = document.getElementById('filter-type').value;
+
+    let url = '/api/activity?limit=1000';
+    if (direction) url += '&direction=' + direction;
+    if (type) url += '&record_type=' + type;
+
+    fetch(url)
+      .then(r => r.json())
+      .then(function(data) {
+        let csv = 'Timestamp,Direction,Type,Connection ID,Content\n';
+        data.forEach(function(item) {
+          const escapedContent = item.raw_content.replace(/"/g, '""');
+          csv += '"' + item.timestamp + '","' + item.direction + '","' + item.record_type + '","' + (item.connection_id || '') + '","' + escapedContent + '"\n';
+        });
+
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'fias_activity_' + new Date().toISOString().split('T')[0] + '.csv';
+        a.click();
+      });
+  });
+
+  // Load more button
+  document.getElementById('load-more-btn').addEventListener('click', function() {
+    currentLimit += 100;
+    loadActivities();
+  });
+
+  // Load activities using safe DOM methods
+  function loadActivities() {
+    const direction = document.getElementById('filter-direction').value;
+    const type = document.getElementById('filter-type').value;
+
+    let url = '/api/activity?limit=' + currentLimit;
+    if (direction) url += '&direction=' + direction;
+    if (type) url += '&record_type=' + type;
+
+    fetch(url)
+      .then(r => r.json())
+      .then(function(data) {
+        activities = data;
+        renderActivities();
+      });
+  }
+
+  function renderActivities() {
+    const tbody = document.getElementById('activity-tbody');
+    while (tbody.firstChild) {
+      tbody.removeChild(tbody.firstChild);
+    }
+
+    document.getElementById('activity-count').textContent = activities.length + ' entries';
+
+    if (activities.length === 0) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      td.className = 'py-8 text-center text-slate-500';
+      td.textContent = 'No activity logged yet. Connect a FIAS client and send some requests.';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+
+    activities.forEach(function(item) {
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-white/5 hover:bg-white/5';
+
+      // Timestamp
+      const tdTime = document.createElement('td');
+      tdTime.className = 'py-3 text-slate-400 text-xs';
+      tdTime.textContent = new Date(item.timestamp).toLocaleString();
+      tr.appendChild(tdTime);
+
+      // Direction
+      const tdDir = document.createElement('td');
+      tdDir.className = 'py-3';
+      const dirBadge = document.createElement('span');
+      dirBadge.className = item.direction === 'in'
+        ? 'px-2 py-0.5 rounded text-xs font-mono bg-blue-500/20 text-blue-300'
+        : 'px-2 py-0.5 rounded text-xs font-mono bg-green-500/20 text-green-300';
+      dirBadge.textContent = item.direction === 'in' ? 'IN' : 'OUT';
+      tdDir.appendChild(dirBadge);
+      tr.appendChild(tdDir);
+
+      // Type
+      const tdType = document.createElement('td');
+      tdType.className = 'py-3';
+      const typeBadge = document.createElement('span');
+      typeBadge.className = 'px-2 py-0.5 rounded text-xs font-mono bg-indigo-500/20 text-indigo-300';
+      typeBadge.textContent = item.record_type;
+      tdType.appendChild(typeBadge);
+      tr.appendChild(tdType);
+
+      // Content
+      const tdContent = document.createElement('td');
+      tdContent.className = 'py-3 font-mono text-xs truncate max-w-md';
+      tdContent.textContent = item.raw_content;
+      tr.appendChild(tdContent);
+
+      // Connection ID
+      const tdConn = document.createElement('td');
+      tdConn.className = 'py-3 text-slate-500 text-xs';
+      tdConn.textContent = item.connection_id || '-';
+      tr.appendChild(tdConn);
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Initial load
+  loadActivities();
+
+  // Auto-refresh every 10 seconds
+  setInterval(loadActivities, 10000);
+</script>
+{% endblock %}

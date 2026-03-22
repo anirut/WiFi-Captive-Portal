@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Scenarios{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+  <h2 class="text-2xl font-semibold text-white">Test Scenarios</h2>
+</div>
+
+<!-- Scenarios Grid -->
+<div id="scenarios-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  <!-- Loading state -->
+  <div class="glass rounded-xl p-6 col-span-full text-center text-slate-500">
+    Loading scenarios...
+  </div>
+</div>
+
+<script>
+  // Load scenarios using safe DOM methods
+  function loadScenarios() {
+    fetch('/api/scenarios')
+      .then(r => r.json())
+      .then(scenarios => {
+        const grid = document.getElementById('scenarios-grid');
+        while (grid.firstChild) {
+          grid.removeChild(grid.firstChild);
+        }
+
+        if (scenarios.length === 0) {
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'glass rounded-xl p-6 col-span-full text-center text-slate-500';
+          emptyDiv.textContent = 'No scenarios configured. Add scenarios via the API.';
+          grid.appendChild(emptyDiv);
+          return;
+        }
+
+        scenarios.forEach(function(scenario) {
+          const card = document.createElement('div');
+          card.className = scenario.is_active
+            ? 'glass rounded-xl p-6 border-2 border-indigo-500/50'
+            : 'glass rounded-xl p-6';
+
+          // Header with name and status
+          const header = document.createElement('div');
+          header.className = 'flex justify-between items-start mb-4';
+
+          const nameH = document.createElement('h3');
+          nameH.className = 'text-lg font-semibold text-white';
+          nameH.textContent = scenario.name;
+
+          header.appendChild(nameH);
+
+          if (scenario.is_active) {
+            const statusBadge = document.createElement('span');
+            statusBadge.className = 'px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-300';
+            statusBadge.textContent = 'Active';
+            header.appendChild(statusBadge);
+          }
+
+          card.appendChild(header);
+
+          // Description
+          const desc = document.createElement('p');
+          desc.className = 'text-slate-400 text-sm mb-4';
+          desc.textContent = scenario.description || 'No description';
+          card.appendChild(desc);
+
+          // Stats
+          const stats = document.createElement('div');
+          stats.className = 'flex gap-4 mb-4 text-sm';
+
+          const guestsStat = document.createElement('span');
+          guestsStat.className = 'text-slate-500';
+          guestsStat.textContent = scenario.guest_count + ' guests';
+          stats.appendChild(guestsStat);
+
+          const rulesStat = document.createElement('span');
+          rulesStat.className = 'text-slate-500';
+          rulesStat.textContent = scenario.failure_rule_count + ' failure rules';
+          stats.appendChild(rulesStat);
+
+          card.appendChild(stats);
+
+          // Action button
+          if (!scenario.is_active) {
+            const activateBtn = document.createElement('button');
+            activateBtn.className = 'w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors';
+            activateBtn.textContent = 'Activate Scenario';
+            activateBtn.dataset.scenarioId = scenario.id;
+            activateBtn.addEventListener('click', function() {
+              activateScenario(parseInt(this.dataset.scenarioId));
+            });
+            card.appendChild(activateBtn);
+          } else {
+            const activeLabel = document.createElement('div');
+            activeLabel.className = 'w-full px-4 py-2 bg-green-600/20 text-green-300 rounded-lg text-sm font-medium text-center';
+            activeLabel.textContent = 'Currently Active';
+            card.appendChild(activeLabel);
+          }
+
+          grid.appendChild(card);
+        });
+      });
+  }
+
+  // Activate scenario
+  function activateScenario(id) {
+    fetch('/api/scenarios/' + id + '/activate', {method: 'POST'})
+      .then(r => r.json())
+      .then(function(result) {
+        if (result.message) {
+          loadScenarios();
+        } else {
+          alert('Error: ' + JSON.stringify(result));
+        }
+      })
+      .catch(function(err) { alert('Error: ' + err); });
+  }
+
+  // Initial load
+  loadScenarios();
+</script>
+{% endblock %}

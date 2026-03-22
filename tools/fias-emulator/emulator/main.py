@@ -16,13 +16,13 @@ from typing import AsyncGenerator
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from emulator.config import settings
-from emulator.database import close_db, get_db, init_db
+from emulator.database import AsyncSessionFactory, close_db, get_db, init_db
 from emulator.fias_server import FIASServer
 from emulator.management import router as management_router
-from emulator.models import ActivityLog
+from emulator.models import ActivityLog, Connection, Guest, Scenario
 
 logger = logging.getLogger(__name__)
 
@@ -163,10 +163,42 @@ async def activity_stream():
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Main dashboard page."""
-    # Check if templates directory exists, otherwise return simple response
     try:
-        return templates.TemplateResponse("dashboard.html", {"request": request})
-    except Exception:
+        # Gather dashboard statistics
+        async with AsyncSessionFactory() as db:
+            # Connection counts
+            connection_count = await db.scalar(
+                select(func.count()).select_from(Connection).where(Connection.is_active == True)
+            ) or 0
+            total_connections = await db.scalar(
+                select(func.count()).select_from(Connection)
+            ) or 0
+
+            # Guest counts
+            guest_count = await db.scalar(select(func.count()).select_from(Guest)) or 0
+            active_guest_count = await db.scalar(
+                select(func.count()).select_from(Guest).where(Guest.is_active == True)
+            ) or 0
+
+            # Scenario info
+            scenario_count = await db.scalar(select(func.count()).select_from(Scenario)) or 0
+            active_scenario = await db.scalar(
+                select(Scenario.name).where(Scenario.is_active == True)
+            )
+
+        context = {
+            "request": request,
+            "tcp_port": settings.fias_tcp_port,
+            "connection_count": connection_count,
+            "total_connections": total_connections,
+            "guest_count": guest_count,
+            "active_guest_count": active_guest_count,
+            "scenario_count": scenario_count,
+            "active_scenario": active_scenario or "None",
+        }
+        return templates.TemplateResponse("dashboard.html", context)
+    except Exception as e:
+        logger.error(f"Error rendering dashboard: {e}")
         return HTMLResponse(
             content="""
             <!DOCTYPE html>
