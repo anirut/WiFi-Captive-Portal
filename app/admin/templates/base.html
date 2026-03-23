@@ -509,6 +509,28 @@
         }
       });
     });
+
+    // HTMX: Convert form data to JSON for json-enc forms
+    document.addEventListener('htmx:beforeRequest', function(evt) {
+      const form = evt.detail.xhr.target;
+      if (form && form.hasAttribute('hx-ext') && form.getAttribute('hx-ext').includes('json-enc')) {
+        try {
+          // Get form data
+          const formData = new FormData(form);
+          const obj = {};
+          formData.forEach((value, key) => {
+            // Convert empty strings to null
+            obj[key] = value === '' ? null : value;
+          });
+          // Replace body with JSON
+          evt.detail.xhr.body = JSON.stringify(obj);
+          // Set proper content type
+          evt.detail.xhr.setRequestHeader('Content-Type', 'application/json');
+        } catch (e) {
+          console.error('HTMX JSON encoding error:', e);
+        }
+      }
+    });
   </script>
 
 </body>
