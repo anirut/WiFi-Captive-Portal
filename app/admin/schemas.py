@@ -37,7 +37,14 @@ class VoucherCreate(BaseModel):
     @classmethod
     def empty_str_to_none(cls, v):
         """Convert empty strings to None for optional int fields."""
-        if v == '' or v is None:
+        if isinstance(v, str):
+            if v == '' or v.strip() == '':
+                return None
+            try:
+                return int(v)
+            except ValueError:
+                return None
+        if v is None:
             return None
         return v
 
@@ -51,11 +58,18 @@ class BatchVoucherCreate(BaseModel):
     expires_at: datetime | None = None
     count: int = Field(ge=1, le=100)
 
-    @field_validator('duration_minutes', 'data_limit_mb', mode='before')
+    @field_validator('duration_minutes', 'data_limit_mb', 'count', mode='before')
     @classmethod
     def empty_str_to_none(cls, v):
-        """Convert empty strings to None for optional int fields."""
-        if v == '' or v is None:
+        """Convert empty strings to None for optional fields, convert string ints."""
+        if isinstance(v, str):
+            if v == '' or v.strip() == '':
+                return None
+            try:
+                return int(v)
+            except ValueError:
+                return None
+        if v is None:
             return None
         return v
 
