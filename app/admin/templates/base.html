@@ -519,10 +519,17 @@
           const formData = new FormData(form);
           const obj = {};
           formData.forEach((value, key) => {
-            // Convert empty strings to null
-            obj[key] = value === '' ? null : value;
+            // Convert empty strings to null, try to parse numbers
+            if (value === '') {
+              obj[key] = null;
+            } else if (value !== null && !isNaN(value) && value.trim() !== '') {
+              // Try to parse as number if it looks numeric
+              obj[key] = isNaN(parseFloat(value)) ? value : parseFloat(value);
+            } else {
+              obj[key] = value;
+            }
           });
-          // Replace body with JSON
+          // Replace body with JSON string
           evt.detail.xhr.body = JSON.stringify(obj);
           // Set proper content type
           evt.detail.xhr.setRequestHeader('Content-Type', 'application/json');

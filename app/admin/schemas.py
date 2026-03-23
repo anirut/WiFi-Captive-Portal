@@ -1,7 +1,7 @@
-from typing import Literal, Union
+from typing import Literal
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field
 from app.core.models import PMSAdapterType, VoucherType
 
 
@@ -26,56 +26,22 @@ class PMSTestResult(BaseModel):
 
 
 class VoucherCreate(BaseModel):
-    model_config = ConfigDict(coerce_numbers_to_str=False)
-
     type: VoucherType
-    duration_minutes: Union[int, str, None] = None
-    data_limit_mb: Union[int, str, None] = None
-    max_devices: Union[int, str] = 1
-    max_uses: Union[int, str] = 1
+    duration_minutes: int | None = None
+    data_limit_mb: int | None = None
+    max_devices: int = 1
+    max_uses: int = 1
     expires_at: datetime | None = None
-
-    @field_validator('duration_minutes', 'data_limit_mb', 'max_uses', 'max_devices', mode='before')
-    @classmethod
-    def coerce_fields(cls, v):
-        """Convert empty strings to None, convert string integers."""
-        if isinstance(v, str):
-            if v == '' or v.strip() == '':
-                return None
-            try:
-                return int(v)
-            except (ValueError, TypeError):
-                return None
-        if v is None or v == '':
-            return None
-        return v
 
 
 class BatchVoucherCreate(BaseModel):
-    model_config = ConfigDict(coerce_numbers_to_str=False)
-
     type: str  # "time" | "data"
-    duration_minutes: Union[int, str, None] = None
-    data_limit_mb: Union[int, str, None] = None
-    max_uses: Union[int, str] = 1
-    max_devices: Union[int, str] = 1
+    duration_minutes: int | None = None
+    data_limit_mb: int | None = None
+    max_uses: int = 1
+    max_devices: int = 1
     expires_at: datetime | None = None
-    count: Union[int, str] = Field(ge=1, le=100)
-
-    @field_validator('duration_minutes', 'data_limit_mb', 'count', 'max_uses', 'max_devices', mode='before')
-    @classmethod
-    def coerce_fields(cls, v):
-        """Convert empty strings to None, convert string integers."""
-        if isinstance(v, str):
-            if v == '' or v.strip() == '':
-                return None
-            try:
-                return int(v)
-            except (ValueError, TypeError):
-                return None
-        if v is None or v == '':
-            return None
-        return v
+    count: int = Field(ge=1, le=100)
 
 
 class VoucherResponse(BaseModel):
