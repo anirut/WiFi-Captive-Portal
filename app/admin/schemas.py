@@ -15,8 +15,36 @@ class PMSConfigResponse(BaseModel):
 
 class PMSConfigUpdate(BaseModel):
     type: PMSAdapterType
-    config: dict  # plaintext — encrypted before DB write
+    config: dict | None = None  # plaintext — encrypted before DB write
     webhook_secret: str | None = None
+
+    # Individual fields for form submission
+    host: str | None = None
+    port: str | None = None
+    auth_key: str | None = None
+    vendor_id: str | None = None
+    base_url: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    hotel_id: str | None = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def build_config_dict(cls, data):
+        """Build config dict from individual fields if not provided."""
+        if isinstance(data, dict):
+            # If config not provided, build it from individual fields
+            if 'config' not in data or data['config'] is None:
+                config = {}
+                for field in ['host', 'port', 'auth_key', 'vendor_id', 'base_url',
+                             'client_id', 'client_secret', 'hotel_id']:
+                    if field in data and data[field]:
+                        config[field] = data[field]
+                if config:
+                    data['config'] = config
+                else:
+                    data['config'] = {}  # Empty dict is required
+        return data
 
 
 class PMSTestResult(BaseModel):
