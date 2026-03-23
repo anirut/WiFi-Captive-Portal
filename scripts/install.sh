@@ -558,7 +558,7 @@ info "Persistent IP $PORTAL_IP/24 configured on $WIFI_INTERFACE via netplan."
 # =============================================================================
 step "CONFIGURING NETWORK RULES"
 
-info "Setting up nftables + flowtables + tc..."
+info "Setting up nftables + tc..."
 bash "$SCRIPT_DIR/setup-nftables.sh" \
     --wifi "$WIFI_INTERFACE" \
     --wan "$WAN_INTERFACE" \

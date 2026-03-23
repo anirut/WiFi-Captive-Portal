@@ -271,7 +271,7 @@ PYEOF
 ### ขั้นตอนที่ 9: ตั้งค่า Network Rules
 
 ```bash
-# nftables + flowtables + tc (ต้องรัน root)
+# nftables + tc (ต้องรัน root)
 sudo bash scripts/setup-nftables.sh \
     --wifi wlan0 \
     --wan eth0 \
@@ -376,9 +376,6 @@ sudo nft list table inet captive_portal
 
 # ดู whitelist set
 sudo nft list set inet captive_portal whitelist
-
-# ดู flowtable
-sudo nft list flowtable inet captive_portal ft
 
 # ดู tc rules
 sudo tc qdisc show dev eth0
@@ -499,7 +496,7 @@ grep captive /etc/postgresql/*/main/pg_hba.conf
 # ตรวจว่า nftables ติดตั้ง
 nft --version
 
-# ตรวจ kernel version (ต้อง >= 4.16 สำหรับ flowtables)
+# ตรวจ kernel version
 uname -r
 
 # ตรวจว่า table มีอยู่

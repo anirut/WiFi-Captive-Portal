@@ -2,22 +2,24 @@
 
 **Version:** 2.0.0
 **Date:** 2026-03-21
-**Status:** Draft
+**Status:** Implemented
+
+> **Note (2026-03-23):** Flowtable was removed after production testing revealed that on kernel 6.17, the flowtable's fast-path did not correctly apply reverse NAT (un-masquerade), causing TCP return traffic to never reach clients. The implementation uses standard conntrack-based NAT without flowtable offloading.
 
 ## Context
 
-The current WiFi Captive Portal uses `iptables` for firewall/NAT and `tc` (HTB) for bandwidth shaping. This design proposes migrating to `nftables` with `flowtables` for improved performance:
+The current WiFi Captive Portal uses `iptables` for firewall/NAT and `tc` (HTB) for bandwidth shaping. This design proposes migrating to `nftables` for improved performance:
 
 - **Problem:** iptables has higher CPU overhead per packet, linear chain lookups
-- **Solution:** nftables with set-based O(1) lookups + flowtables for fast-path bypass
-- **Benefit:** ~20-30% CPU reduction for packet processing, better scalability
+- **Solution:** nftables with set-based O(1) lookups
+- **Benefit:** O(1) set lookups, cleaner rule syntax, better scalability
 
 ## Scope
 
 | In Scope | Out of Scope |
 |----------|--------------|
 | Replace iptables with nftables | Database schema changes |
-| Add flowtables for established traffic | PMS adapter changes |
+| ~~Add flowtables for established traffic~~ (removed — see note) | PMS adapter changes |
 | Keep tc for bandwidth shaping | Frontend changes |
 | Redesign Python API | Portal routes changes |
 | Single setup script | - |
@@ -28,7 +30,7 @@ The current WiFi Captive Portal uses `iptables` for firewall/NAT and `tc` (HTB) 
 
 | File | Purpose |
 |------|---------|
-| `app/network/nftables.py` | nftables operations (sets, flowtables) |
+| `app/network/nftables.py` | nftables operations (sets) |
 | `scripts/setup-nftables.sh` | Combined initialization script |
 
 ### Files to Delete
@@ -65,11 +67,6 @@ table inet captive_portal {
     set whitelist { type ipv4_addr; }
     set dns_bypass { type ipv4_addr; }
 
-    flowtable f {
-        hook ingress priority 0
-        devices = { $WIFI_INTERFACE, $WAN_INTERFACE }
-    }
-
     # DNAT for DNS bypass and portal redirect
     chain prerouting {
         type nat hook prerouting priority dstnat; policy accept;
@@ -78,9 +75,8 @@ table inet captive_portal {
         ip saddr @dns_bypass udp dport 53 dnat to $DNS_UPSTREAM_IP:53
         ip saddr @dns_bypass tcp dport 53 dnat to $DNS_UPSTREAM_IP:53
 
-        # Portal redirect for unauthenticated users (HTTP/HTTPS)
+        # Portal redirect for unauthenticated users (HTTP only)
         ip saddr != @whitelist tcp dport 80 dnat to $PORTAL_IP:$PORTAL_PORT
-        ip saddr != @whitelist tcp dport 443 dnat to $PORTAL_IP:$PORTAL_PORT
     }
 
     # SNAT/Masquerade for internet access
@@ -89,14 +85,22 @@ table inet captive_portal {
         oifname $WAN_INTERFACE ip saddr @whitelist masquerade
     }
 
+    chain input {
+        type filter hook input priority filter; policy accept;
+        # TCP RST for unauthenticated HTTPS — triggers captive portal detection
+        tcp dport 443 ct state new ip saddr != @whitelist reject with tcp reset
+    }
+
     chain forward {
         type filter hook forward priority filter; policy drop;
-        ct state established,related flow add @f accept
+        ct state established,related accept
         ip saddr @whitelist accept
         reject with icmp type host-unreachable
     }
 }
 ```
+
+> **Note:** Flowtable (`flow add @f`) was removed — on kernel 6.17 it broke TCP forwarding by failing to apply reverse NAT (un-masquerade) for return traffic in the fast path.
 
 ### New Config Variables
 

@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Migrate from iptables to nftables with flowtables for improved performance (20-30% CPU reduction, O(1) lookup).
+**Goal:** Migrate from iptables to nftables for improved performance (O(1) set lookups).
+
+> **Note (2026-03-23):** Flowtable was removed after production testing — on kernel 6.17, the flowtable fast-path did not apply reverse NAT (un-masquerade), breaking TCP forwarding. Standard conntrack-based NAT is used instead.
 
 **Architecture:** Replace iptables.py with nftables.py using set-based whitelist/dns_bypass. Keep tc for bandwidth shaping. Single setup-nftables.sh script for initialization.
 
@@ -16,7 +18,7 @@
 | File | Purpose |
 |------|---------|
 | `app/network/nftables.py` | nftables set operations |
-| `scripts/setup-nftables.sh` | Combined nftables + tc + flowtables setup |
+| `scripts/setup-nftables.sh` | Combined nftables + tc setup |
 | `tests/test_network/test_nftables.py` | Unit tests for nftables |
 
 ### Files to Delete

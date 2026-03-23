@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request, Depends, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select as sa_select
@@ -164,3 +164,41 @@ async def disconnect(request: Request, db: AsyncSession = Depends(get_db)):
     if session:
         await session_manager.expire_session(db, session, SessionStatus.kicked)
     return {"status": "disconnected"}
+
+
+# ── Captive Portal Detection ──────────────────────────────────────────────────
+# All OS/browser probes must receive a redirect (not 404) to trigger the
+# captive portal login dialog automatically.
+
+def _portal_redirect(request: Request) -> RedirectResponse:
+    """Redirect to the portal login page using the portal's actual IP:port.
+
+    Always uses PORTAL_IP/PORTAL_PORT from settings so the redirect URL is
+    reachable by the client regardless of what Host header was in the probe.
+    """
+    portal_url = f"http://{settings.PORTAL_IP}:{settings.PORTAL_PORT}/"
+    return RedirectResponse(url=portal_url, status_code=302)
+
+
+@router.get("/generate_204")           # Android / Chrome
+@router.get("/hotspot-detect.html")    # Apple iOS / macOS
+@router.get("/library/test/success.html")  # Apple (legacy)
+@router.get("/connecttest.txt")        # Windows NCSI
+@router.get("/ncsi.txt")              # Windows (legacy)
+@router.get("/redirect")              # Generic
+async def captive_portal_probe(request: Request):
+    return _portal_redirect(request)
+
+
+@router.get("/{full_path:path}", response_class=HTMLResponse)
+async def catch_all(request: Request, full_path: str):
+    """Redirect any unknown path to the portal login page.
+
+    This ensures that captive portal detection probes from any OS/browser
+    (using arbitrary probe URLs) are redirected to the login page rather
+    than returning a 404 that devices may interpret as 'no internet'.
+    """
+    # Let admin and static paths fall through to their own routers
+    if full_path.startswith(("admin", "static")):
+        raise HTTPException(status_code=404)
+    return _portal_redirect(request)

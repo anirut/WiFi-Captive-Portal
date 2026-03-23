@@ -189,8 +189,8 @@ if command -v nft &>/dev/null; then
     run_check "nftables table exists" bash -c \
         "nft list table inet captive_portal 2>/dev/null | grep -q 'whitelist'"
 
-    run_check "nftables flowtable configured" bash -c \
-        "nft list table inet captive_portal 2>/dev/null | grep -q 'flowtable'"
+    run_check "nftables forward chain configured" bash -c \
+        "nft list chain inet captive_portal forward 2>/dev/null | grep -q 'established,related accept'"
 else
     fail "nftables not available — required for v2.0"
 fi

@@ -14,7 +14,7 @@ A production-ready **Hotel WiFi Captive Portal** system with enterprise-grade fe
 - 🔐 **Multiple Authentication Methods** - Room + Last Name, Voucher Codes
 - 🏨 **PMS Integrations** - Opera Cloud, Opera FIAS, Cloudbeds, Mews, Custom REST
 - 📊 **Bandwidth Management** - Traffic Control (tc) with HTB shaping
-- 🛡️ **Modern Firewall** - nftables with O(1) set lookups and flowtables
+- 🛡️ **Modern Firewall** - nftables with O(1) set lookups
 - 📱 **Responsive Admin Dashboard** - Real-time analytics, session management
 - 🎫 **Voucher System** - PDF generation with QR codes
 - 🌐 **Multi-language Support** - Thai/English localization

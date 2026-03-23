@@ -1,7 +1,7 @@
 """
 nftables.py - nftables set operations for captive portal.
 
-Replaces iptables.py with set-based O(1) lookups and flowtable support.
+Replaces iptables.py with set-based O(1) lookups.
 """
 import subprocess
 import logging

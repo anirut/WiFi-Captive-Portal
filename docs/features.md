@@ -41,7 +41,7 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 | Cache / Rate Limit / Token Blocklist | Redis |
 | ORM | SQLAlchemy 2.0 (Async) |
 | Migration | Alembic |
-| Network Control | nftables + flowtables + tc (iproute2) |
+| Network Control | nftables + tc (iproute2) |
 | DHCP + DNS | dnsmasq |
 | Scheduler | APScheduler 3.x |
 | Frontend | Jinja2 + HTMX + Alpine.js + Tailwind CSS |
