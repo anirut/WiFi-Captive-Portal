@@ -357,7 +357,7 @@ async def download_voucher_pdf(
 @router.get("/vouchers", response_class=HTMLResponse, include_in_schema=False)
 async def vouchers_page(request: Request, payload: dict = Depends(get_current_admin),
                          db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Voucher).order_by(Voucher.created_at.desc()).limit(100))
+    result = await db.execute(select(Voucher).order_by(Voucher.id.desc()).limit(100))
     vouchers = result.scalars().all()
     flash = request.session.pop("flash", None)
     return _templates.TemplateResponse("vouchers.html", {
