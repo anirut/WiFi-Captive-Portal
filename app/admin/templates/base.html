@@ -7,39 +7,419 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/lucide@latest/dist/umd/lucide.min.css"/>
   <style>
-    body { font-family: 'Inter', sans-serif; background: #0f172a; color: #e2e8f0; }
-    .glass { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(12px); }
-    .gradient-accent { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      transition: background 0.3s ease;
+    }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      background: linear-gradient(135deg, #1a2847 0%, #151e2f 100%);
+      border-right: 2px solid #3b82f6;
+      transition: all 0.3s ease;
+    }
+
+    .sidebar-logo {
+      font-size: 18px;
+      font-weight: 800;
+      color: #3b82f6;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .sidebar-subtitle {
+      font-size: 11px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .nav-item {
+      color: #cbd5e1;
+      padding: 12px 16px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      position: relative;
+      text-decoration: none;
+    }
+
+    .nav-item:hover {
+      background: rgba(59, 130, 246, 0.1);
+      color: #3b82f6;
+      transform: translateX(4px);
+    }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
+      color: #3b82f6;
+    }
+
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: #3b82f6;
+      border-radius: 0 3px 3px 0;
+    }
+
+    .nav-item svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    /* ===== MAIN CONTENT ===== */
+    .page-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 28px;
+      letter-spacing: -0.5px;
+    }
+
+    /* ===== CARDS ===== */
+    .card {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 12px;
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(59, 130, 246, 0.3);
+      background: rgba(30, 41, 59, 0.7);
+    }
+
+    .card-accent {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .card-label {
+      font-size: 12px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .card-value {
+      font-size: 32px;
+      font-weight: 800;
+      color: #3b82f6;
+      letter-spacing: -1px;
+    }
+
+    /* ===== TABLES ===== */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    table th {
+      padding: 12px 0;
+      font-weight: 600;
+      color: #94a3b8;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      text-align: left;
+    }
+
+    table td {
+      padding: 12px 0;
+      color: #cbd5e1;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    }
+
+    table tr:hover {
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    /* ===== STATUS BADGE ===== */
+    .badge {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-success {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+
+    .badge-warning {
+      background: rgba(251, 146, 60, 0.2);
+      color: #fb923c;
+    }
+
+    .badge-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+
+    /* ===== ALERT ===== */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      border: 1px solid;
+    }
+
+    .alert-warning {
+      background: rgba(251, 146, 60, 0.1);
+      border-color: rgba(251, 146, 60, 0.3);
+      color: #fed7aa;
+    }
+
+    /* ===== LOGOUT BUTTON ===== */
+    .logout-btn {
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #f87171;
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.2);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logout-btn:hover {
+      background: rgba(248, 113, 113, 0.15);
+      border-color: rgba(248, 113, 113, 0.3);
+    }
+
+    .logout-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* ===== FORMS ===== */
+    input, select, textarea {
+      width: 100%;
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #f1f5f9;
+      font-family: 'Poppins', sans-serif;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #3b82f6;
+      background: rgba(30, 41, 59, 0.8);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    input::placeholder, select::placeholder, textarea::placeholder {
+      color: #64748b;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-secondary {
+      background: rgba(59, 130, 246, 0.1);
+      color: #3b82f6;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.5);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    .btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+        position: fixed;
+        z-index: 40;
+        width: 250px;
+      }
+
+      main {
+        margin-left: 0 !important;
+      }
+    }
   </style>
   {% block head %}{% endblock %}
 </head>
-<body class="min-h-screen flex">
+<body class="flex min-h-screen">
 
   <!-- Sidebar -->
-  <aside class="w-64 min-h-screen glass flex flex-col p-4 fixed top-0 left-0">
+  <aside class="sidebar w-64 min-h-screen flex flex-col p-6 fixed top-0 left-0">
+    <!-- Logo -->
     <div class="mb-8">
-      <h1 class="text-xl font-bold gradient-accent bg-clip-text text-transparent">Hotel WiFi</h1>
-      <p class="text-xs text-slate-400">Admin Panel</p>
+      <div class="sidebar-logo">⚡ Hotel WiFi</div>
+      <div class="sidebar-subtitle">Admin Panel</div>
     </div>
+
+    <!-- Navigation -->
     <nav class="flex-1 space-y-1">
-      <a href="/admin/" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Dashboard</a>
-      <a href="/admin/sessions" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Sessions</a>
-      <a href="/admin/vouchers" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Vouchers</a>
+      <a href="/admin/" class="nav-item {% if request.url.path == '/admin/' %}active{% endif %}">
+        <svg class="lucide lucide-chart-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-7 7"/>
+        </svg>
+        <span>Dashboard</span>
+      </a>
+
+      <a href="/admin/sessions" class="nav-item {% if '/sessions' in request.url.path %}active{% endif %}">
+        <svg class="lucide lucide-wifi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M9 20h6"/><circle cx="12" cy="20" r="1"/>
+        </svg>
+        <span>Sessions</span>
+      </a>
+
+      <a href="/admin/vouchers" class="nav-item {% if '/vouchers' in request.url.path %}active{% endif %}">
+        <svg class="lucide lucide-ticket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M2 9a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v2h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2v2a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-2H2a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2h2V9z"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/>
+        </svg>
+        <span>Vouchers</span>
+      </a>
+
       {% if current_user.role == 'superadmin' %}
-      <a href="/admin/policies" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Rooms &amp; Policies</a>
-      <a href="/admin/analytics" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Analytics</a>
-      <a href="/admin/pms" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">PMS Settings</a>
-      <a href="/admin/brand" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Brand &amp; Config</a>
-      <a href="/admin/users" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">Admin Users</a>
-      <a href="/admin/dhcp" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-sm">DHCP / DNS</a>
+      <a href="/admin/policies" class="nav-item {% if '/policies' in request.url.path %}active{% endif %}">
+        <svg class="lucide lucide-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+        </svg>
+        <span>Rooms &amp; Policies</span>
+      </a>
+
+      <a href="/admin/analytics" class="nav-item {% if '/analytics' in request.url.path %}active{% endif %}">
+        <svg class="lucide lucide-bar-chart-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <span>Analytics</span>
+      </a>
+
+      <a href="/admin/pms" class="nav-item {% if '/pms' in request.url.path %}active{% endif %}">
+        <svg class="lucide lucide-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m2.98 2.98l4.24 4.24M1 12h6m6 0h6m-15.78 7.78l4.24-4.24m2.98-2.98l4.24-4.24"/>
+        </svg>
+        <span>PMS Settings</span>
+      </a>
+
+      <a href="/admin/brand" class="nav-item {% if '/brand' in request.url.path %}active{% endif %}">
+        <svg class="lucide lucide-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="16" cy="8" r="1.5"/><circle cx="8" cy="16" r="1.5"/>
+        </svg>
+        <span>Brand &amp; Config</span>
+      </a>
+
+      <a href="/admin/users" class="nav-item {% if '/users' in request.url.path %}active{% endif %}">
+        <svg class="lucide lucide-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        <span>Admin Users</span>
+      </a>
+
+      <a href="/admin/dhcp" class="nav-item {% if '/dhcp' in request.url.path %}active{% endif %}">
+        <svg class="lucide lucide-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="2" width="20" height="8" rx="1" ry="1"/><rect x="2" y="14" width="20" height="8" rx="1" ry="1"/><line x1="6" y1="6" x2="6" y2="6.01"/><line x1="6" y1="18" x2="6" y2="18.01"/>
+        </svg>
+        <span>DHCP / DNS</span>
+      </a>
       {% endif %}
     </nav>
-    <div class="mt-auto pt-4 border-t border-white/10">
-      <p class="text-xs text-slate-400 mb-2">{{ current_user.sub }} <span class="text-indigo-400">({{ current_user.role }})</span></p>
-      <form action="/admin/logout" method="post">
-        <button class="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg">Logout</button>
+
+    <!-- User Section -->
+    <div class="pt-4 border-t border-slate-600/30">
+      <p class="text-xs text-slate-400 mb-3">
+        {{ current_user.sub }}
+        <span class="text-blue-400 font-semibold block mt-1">{{ current_user.role }}</span>
+      </p>
+      <form action="/admin/logout" method="post" style="margin: 0;">
+        <button type="submit" class="logout-btn">
+          <svg class="lucide lucide-log-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Logout
+        </button>
       </form>
     </div>
   </aside>
@@ -47,12 +427,25 @@
   <!-- Main Content -->
   <main class="ml-64 flex-1 p-8">
     {% if flash %}
-    <div class="mb-4 px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-sm">
+    <div class="alert alert-warning">
       {{ flash }}
     </div>
     {% endif %}
     {% block content %}{% endblock %}
   </main>
+
+  <script>
+    // Set active nav item based on current path
+    document.addEventListener('DOMContentLoaded', function() {
+      const currentPath = window.location.pathname;
+      document.querySelectorAll('.nav-item').forEach(item => {
+        const href = item.getAttribute('href');
+        if (currentPath.startsWith(href) && (currentPath === href || currentPath === href + '/' || currentPath.split('/')[2] === href.split('/')[2])) {
+          item.classList.add('active');
+        }
+      });
+    });
+  </script>
 
 </body>
 </html>

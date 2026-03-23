@@ -1,32 +1,62 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<h2 class="text-2xl font-semibold text-white mb-6">Dashboard</h2>
-<div class="grid grid-cols-3 gap-6 mb-8">
-  <div class="glass rounded-xl p-6">
-    <p class="text-slate-400 text-sm">Active Sessions</p>
-    <p class="text-3xl font-bold text-white mt-1">{{ active_count }}</p>
+<div class="page-title">Dashboard</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+  <div class="card card-accent">
+    <div class="card-label">Active Sessions</div>
+    <div class="card-value">{{ active_count }}</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Total Vouchers</div>
+    <div class="card-value" style="color: #10b981;">{{ voucher_count|default(0) }}</div>
+  </div>
+  <div class="card">
+    <div class="card-label">System Status</div>
+    <div class="card-value" style="color: #06b6d4; font-size: 16px; display: flex; align-items: center; gap: 8px; height: auto;">
+      <span style="width: 10px; height: 10px; background: #22c55e; border-radius: 50%; display: inline-block;"></span>
+      <span>Operational</span>
+    </div>
   </div>
 </div>
-<div class="glass rounded-xl p-6">
-  <h3 class="text-lg font-semibold text-white mb-4">Recent Sessions</h3>
-  <table class="w-full text-sm text-slate-300">
-    <thead><tr class="text-slate-500 border-b border-white/10">
-      <th class="pb-2 text-left">IP</th>
-      <th class="pb-2 text-left">Expires</th>
-      <th class="pb-2 text-left">Status</th>
-    </tr></thead>
+
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h3 style="font-size: 18px; font-weight: 700; color: #f1f5f9;">Recent Sessions</h3>
+    <a href="/admin/sessions" style="font-size: 13px; color: #3b82f6; text-decoration: none; font-weight: 600; cursor: pointer;">View all →</a>
+  </div>
+  {% if recent_sessions %}
+  <table>
+    <thead>
+      <tr>
+        <th>IP Address</th>
+        <th>Expires</th>
+        <th>Status</th>
+      </tr>
+    </thead>
     <tbody>
     {% for s in recent_sessions %}
-    <tr class="border-b border-white/5 hover:bg-white/5">
-      <td class="py-2">{{ s.ip_address }}</td>
-      <td class="py-2">{{ s.expires_at.strftime('%Y-%m-%d %H:%M') if s.expires_at else '-' }}</td>
-      <td class="py-2"><span class="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-300">{{ s.status.value }}</span></td>
+    <tr>
+      <td>{{ s.ip_address }}</td>
+      <td>{{ s.expires_at.strftime('%Y-%m-%d %H:%M') if s.expires_at else '-' }}</td>
+      <td>
+        {% if s.status.value == 'active' %}
+          <span class="badge badge-success">Active</span>
+        {% elif s.status.value == 'expired' %}
+          <span class="badge badge-warning">Expired</span>
+        {% else %}
+          <span class="badge badge-danger">{{ s.status.value }}</span>
+        {% endif %}
+      </td>
     </tr>
-    {% else %}
-    <tr><td colspan="3" class="py-4 text-center text-slate-500">No active sessions</td></tr>
     {% endfor %}
     </tbody>
   </table>
+  {% else %}
+  <div style="text-align: center; padding: 40px 20px; color: #64748b;">
+    <p style="font-size: 14px;">No active sessions yet</p>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

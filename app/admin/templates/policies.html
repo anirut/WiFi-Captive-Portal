@@ -1,52 +1,69 @@
 {% extends "base.html" %}
 {% block title %}Rooms & Policies{% endblock %}
 {% block content %}
-<h2 class="text-2xl font-semibold text-white mb-6">Policies</h2>
 
-<!-- Add Policy Form -->
-<div class="glass rounded-xl p-6 mb-6" x-data="{open:false}">
-  <div class="flex justify-between items-center">
-    <h3 class="text-lg font-semibold text-white">Policy List</h3>
-    <button @click="open=!open" class="px-4 py-2 rounded text-white text-sm" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">+ Add Policy</button>
+<div class="page-title">Rooms &amp; Policies</div>
+
+<!-- Policy List Card -->
+<div class="card" x-data="{open:false}">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h3 style="font-size: 18px; font-weight: 700; color: #f1f5f9;">Policies</h3>
+    <button @click="open=!open" class="btn btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      Add Policy
+    </button>
   </div>
-  <div x-show="open" class="mt-4 space-y-3">
-    <form hx-post="/admin/api/policies" hx-target="#policy-list" hx-swap="innerHTML" class="grid grid-cols-3 gap-3">
-      <input name="name" placeholder="Policy name" required class="bg-white/5 border border-white/10 rounded px-3 py-2 text-white col-span-3"/>
-      <input name="bandwidth_up_kbps" type="number" placeholder="Up kbps" value="0" class="bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
-      <input name="bandwidth_down_kbps" type="number" placeholder="Down kbps" value="0" class="bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
-      <input name="max_devices" type="number" placeholder="Max devices" value="3" class="bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
-      <button type="submit" class="col-span-3 py-2 rounded text-white" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Create Policy</button>
+
+  <div x-show="open" class="mb-6 p-4 bg-rgba(59, 130, 246, 0.05) border border-rgba(59, 130, 246, 0.2) rounded-8" style="display: none;">
+    <form hx-post="/admin/api/policies" hx-target="#policy-list" hx-swap="innerHTML" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <input name="name" placeholder="Policy name" required />
+      <input name="bandwidth_up_kbps" type="number" placeholder="Upload speed (kbps)" value="0"/>
+      <input name="bandwidth_down_kbps" type="number" placeholder="Download speed (kbps)" value="0"/>
+      <input name="max_devices" type="number" placeholder="Max devices" value="3" class="md:col-span-1"/>
+      <button type="submit" class="btn btn-primary md:col-span-3">Create Policy</button>
     </form>
   </div>
+
+  <div id="policy-list">
+    {% if policies %}
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Upload</th>
+          <th>Download</th>
+          <th>Max Devices</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in policies %}
+      <tr>
+        <td><strong>{{ p.name }}</strong></td>
+        <td>{{ p.bandwidth_up_kbps }} kbps</td>
+        <td>{{ p.bandwidth_down_kbps }} kbps</td>
+        <td>{{ p.max_devices }}</td>
+        <td>
+          <button hx-delete="/admin/api/policies/{{ p.id }}"
+                  hx-confirm="Delete this policy?"
+                  hx-target="closest tr" hx-swap="outerHTML"
+                  class="btn btn-danger"
+                  style="padding: 6px 10px; font-size: 12px;">
+            Delete
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align: center; padding: 40px 20px; color: #64748b;">
+      <p>No policies yet. Add one to get started!</p>
+    </div>
+    {% endif %}
+  </div>
 </div>
 
-<div id="policy-list" class="glass rounded-xl p-6">
-  <table class="w-full text-sm text-slate-300">
-    <thead><tr class="text-slate-500 border-b border-white/10">
-      <th class="pb-2 text-left">Name</th>
-      <th class="pb-2 text-left">Up kbps</th>
-      <th class="pb-2 text-left">Down kbps</th>
-      <th class="pb-2 text-left">Max Devices</th>
-      <th class="pb-2 text-left"></th>
-    </tr></thead>
-    <tbody>
-    {% for p in policies %}
-    <tr class="border-b border-white/5">
-      <td class="py-2">{{ p.name }}</td>
-      <td class="py-2">{{ p.bandwidth_up_kbps }}</td>
-      <td class="py-2">{{ p.bandwidth_down_kbps }}</td>
-      <td class="py-2">{{ p.max_devices }}</td>
-      <td class="py-2">
-        <button hx-delete="/admin/api/policies/{{ p.id }}"
-                hx-confirm="Delete this policy?"
-                hx-target="closest tr" hx-swap="outerHTML"
-                class="px-2 py-1 text-xs bg-red-500/20 text-red-300 rounded">Delete</button>
-      </td>
-    </tr>
-    {% else %}
-    <tr><td colspan="5" class="py-4 text-center text-slate-500">No policies</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
 {% endblock %}

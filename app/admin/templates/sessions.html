@@ -2,27 +2,28 @@
 {% block title %}Sessions{% endblock %}
 {% block content %}
 
-<div>
-  <h2 class="text-2xl font-semibold text-white mb-6">Active Sessions</h2>
-  <div class="glass rounded-xl p-6">
-    <table class="w-full text-sm text-slate-300" id="session-table">
-      <thead><tr class="text-slate-500 border-b border-white/10">
-        <th class="pb-2 text-left">IP</th>
-        <th class="pb-2 text-left">Room / Voucher</th>
-        <th class="pb-2 text-left">Connected</th>
-        <th class="pb-2 text-left">Expires</th>
-        <th class="pb-2 text-left">Down</th>
-        <th class="pb-2 text-left"></th>
-      </tr></thead>
-      <tbody id="session-tbody"
-             hx-get="/admin/sessions/rows"
-             hx-trigger="every 30s"
-             hx-target="#session-tbody"
-             hx-swap="outerHTML">
-        {% include "sessions_rows.html" %}
-      </tbody>
-    </table>
-  </div>
+<div class="page-title">Active Sessions</div>
+
+<div class="card">
+  <table id="session-table">
+    <thead>
+      <tr>
+        <th>IP Address</th>
+        <th>Room / Voucher</th>
+        <th>Connected</th>
+        <th>Expires</th>
+        <th>Bandwidth</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="session-tbody"
+           hx-get="/admin/sessions/rows"
+           hx-trigger="every 30s"
+           hx-target="#session-tbody"
+           hx-swap="outerHTML">
+      {% include "sessions_rows.html" %}
+    </tbody>
+  </table>
 </div>
 
 {% endblock %}
