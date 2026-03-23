@@ -45,9 +45,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Hotel WiFi Captive Portal", lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.include_router(portal_router)
 app.include_router(admin_router)
 app.include_router(webhook_router)
+app.include_router(portal_router)
 
 @app.exception_handler(403)
 async def forbidden_handler(request: Request, exc):
