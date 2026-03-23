@@ -137,180 +137,226 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
+      font-size: 14px;
     }
 
     table th {
-      padding: 12px 0;
-      font-weight: 600;
+      padding: 14px 12px;
+      font-weight: 700;
       color: #94a3b8;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      border-bottom: 1.5px solid rgba(148, 163, 184, 0.15);
       text-align: left;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      font-size: 12px;
     }
 
     table td {
-      padding: 12px 0;
+      padding: 14px 12px;
       color: #cbd5e1;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      vertical-align: middle;
     }
 
-    table tr:hover {
-      background: rgba(59, 130, 246, 0.05);
+    table tbody tr {
+      transition: all 0.2s;
+    }
+
+    table tbody tr:hover {
+      background: rgba(59, 130, 246, 0.08);
     }
 
     /* ===== STATUS BADGE ===== */
     .badge {
-      display: inline-block;
-      padding: 5px 10px;
-      border-radius: 5px;
-      font-size: 11px;
-      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      gap: 6px;
     }
 
     .badge-success {
       background: rgba(34, 197, 94, 0.2);
       color: #22c55e;
+      border: 1px solid rgba(34, 197, 94, 0.3);
     }
 
     .badge-warning {
       background: rgba(251, 146, 60, 0.2);
       color: #fb923c;
+      border: 1px solid rgba(251, 146, 60, 0.3);
     }
 
     .badge-danger {
       background: rgba(239, 68, 68, 0.2);
       color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
     }
 
     /* ===== ALERT ===== */
     .alert {
-      padding: 12px 16px;
+      padding: 14px 18px;
       border-radius: 10px;
-      font-size: 13px;
-      margin-bottom: 16px;
-      border: 1px solid;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 24px;
+      border: 1.5px solid;
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
     .alert-warning {
-      background: rgba(251, 146, 60, 0.1);
-      border-color: rgba(251, 146, 60, 0.3);
+      background: rgba(251, 146, 60, 0.15);
+      border-color: rgba(251, 146, 60, 0.4);
       color: #fed7aa;
     }
 
     /* ===== LOGOUT BUTTON ===== */
     .logout-btn {
       width: 100%;
-      text-align: left;
-      padding: 10px 12px;
-      border-radius: 8px;
-      font-size: 13px;
-      color: #f87171;
-      background: rgba(248, 113, 113, 0.1);
-      border: 1px solid rgba(248, 113, 113, 0.2);
-      font-weight: 500;
+      padding: 11px 14px;
+      border-radius: 9px;
+      font-size: 14px;
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1.5px solid rgba(239, 68, 68, 0.3);
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+      letter-spacing: 0.2px;
+      min-height: 44px;
     }
 
     .logout-btn:hover {
-      background: rgba(248, 113, 113, 0.15);
-      border-color: rgba(248, 113, 113, 0.3);
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .logout-btn:active {
+      transform: scale(0.98);
     }
 
     .logout-btn svg {
-      width: 16px;
-      height: 16px;
+      width: 18px;
+      height: 18px;
     }
 
     /* ===== FORMS ===== */
     input, select, textarea {
       width: 100%;
-      background: rgba(30, 41, 59, 0.5);
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 8px;
-      padding: 10px 12px;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1.5px solid rgba(148, 163, 184, 0.3);
+      border-radius: 10px;
+      padding: 12px 16px;
       color: #f1f5f9;
       font-family: 'Poppins', sans-serif;
-      font-size: 13px;
-      transition: all 0.2s;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      min-height: 48px;
+      line-height: 1.5;
+    }
+
+    input:hover, select:hover, textarea:hover {
+      background: rgba(30, 41, 59, 0.7);
+      border-color: rgba(148, 163, 184, 0.4);
     }
 
     input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: #3b82f6;
-      background: rgba(30, 41, 59, 0.8);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      background: rgba(30, 41, 59, 0.9);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
     input::placeholder, select::placeholder, textarea::placeholder {
       color: #64748b;
+      font-weight: 400;
     }
 
     label {
       display: block;
-      font-size: 13px;
+      font-size: 14px;
       color: #cbd5e1;
-      margin-bottom: 6px;
-      font-weight: 500;
+      margin-bottom: 8px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
     }
 
     .form-group {
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
 
     /* ===== BUTTONS ===== */
     .btn {
-      padding: 10px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
       border: none;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      justify-content: center;
+      gap: 10px;
       text-decoration: none;
+      min-height: 44px;
+      letter-spacing: 0.3px;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
     }
 
     .btn-primary {
-      background: #3b82f6;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
       color: white;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
     }
 
     .btn-primary:hover {
-      background: #2563eb;
+      background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
     }
 
     .btn-secondary {
-      background: rgba(59, 130, 246, 0.1);
+      background: rgba(59, 130, 246, 0.12);
       color: #3b82f6;
-      border: 1px solid rgba(59, 130, 246, 0.3);
+      border: 1.5px solid rgba(59, 130, 246, 0.4);
     }
 
     .btn-secondary:hover {
-      background: rgba(59, 130, 246, 0.15);
-      border-color: rgba(59, 130, 246, 0.5);
+      background: rgba(59, 130, 246, 0.18);
+      border-color: rgba(59, 130, 246, 0.6);
+      transform: translateY(-1px);
     }
 
     .btn-danger {
-      background: rgba(239, 68, 68, 0.1);
+      background: rgba(239, 68, 68, 0.12);
       color: #ef4444;
-      border: 1px solid rgba(239, 68, 68, 0.3);
+      border: 1.5px solid rgba(239, 68, 68, 0.4);
     }
 
     .btn-danger:hover {
-      background: rgba(239, 68, 68, 0.15);
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.6);
+      transform: translateY(-1px);
     }
 
     .btn svg {
-      width: 16px;
-      height: 16px;
+      width: 18px;
+      height: 18px;
     }
 
     /* ===== RESPONSIVE ===== */
