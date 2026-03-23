@@ -175,15 +175,21 @@ if [[ "${RM_POSTGRES:-N}" =~ ^[Yy]$ ]]; then
 
         info "Removing PostgreSQL packages..."
         apt-get remove -y -qq \
-            postgresql-17 postgresql-contrib-17 postgresql-client-17 \
+            postgresql-18 postgresql-contrib-18 postgresql-client-18 \
             postgresql-common postgresql-client-common \
             2>/dev/null || true
 
         info "Purging PostgreSQL packages..."
         apt-get purge -y -qq \
-            postgresql-17 postgresql-contrib-17 postgresql-client-17 \
+            postgresql-18 postgresql-contrib-18 postgresql-client-18 \
             postgresql-common postgresql-client-common \
             2>/dev/null || true
+
+         # Remove PostgreSQL Cilent  
+        if [[ -d /var/lib/postgresql ]]; then
+            info "Removing PostgreSQL Cilent ..."
+            rm -rf /usr/bin/psql
+        fi
 
         # Remove PostgreSQL data directory
         if [[ -d /var/lib/postgresql ]]; then
