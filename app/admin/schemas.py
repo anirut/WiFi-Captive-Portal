@@ -1,7 +1,7 @@
 from typing import Literal
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
 from app.core.models import PMSAdapterType, VoucherType
 
 
@@ -33,20 +33,22 @@ class VoucherCreate(BaseModel):
     max_uses: int = 1
     expires_at: datetime | None = None
 
-    @field_validator(
-        'duration_minutes', 'data_limit_mb', 'max_devices', 'max_uses',
-        mode='before'
-    )
+    @model_validator(mode='before')
     @classmethod
-    def coerce_int_fields(cls, v):
-        if v == '' or v is None:
-            return None
-        if isinstance(v, str):
-            try:
-                return int(float(v))
-            except (ValueError, TypeError):
-                return None
-        return v
+    def coerce_string_ints(cls, data):
+        """Convert string numbers and empty strings to int/None."""
+        if isinstance(data, dict):
+            for field in ['duration_minutes', 'data_limit_mb', 'max_devices', 'max_uses']:
+                if field in data:
+                    v = data[field]
+                    if v == '' or v is None:
+                        data[field] = None
+                    elif isinstance(v, str):
+                        try:
+                            data[field] = int(float(v))
+                        except (ValueError, TypeError):
+                            data[field] = None
+        return data
 
 
 class BatchVoucherCreate(BaseModel):
@@ -58,20 +60,22 @@ class BatchVoucherCreate(BaseModel):
     expires_at: datetime | None = None
     count: int = Field(ge=1, le=100)
 
-    @field_validator(
-        'duration_minutes', 'data_limit_mb', 'max_uses', 'max_devices', 'count',
-        mode='before'
-    )
+    @model_validator(mode='before')
     @classmethod
-    def coerce_int_fields(cls, v):
-        if v == '' or v is None:
-            return None
-        if isinstance(v, str):
-            try:
-                return int(float(v))
-            except (ValueError, TypeError):
-                return None
-        return v
+    def coerce_string_ints(cls, data):
+        """Convert string numbers and empty strings to int/None."""
+        if isinstance(data, dict):
+            for field in ['duration_minutes', 'data_limit_mb', 'max_uses', 'max_devices', 'count']:
+                if field in data:
+                    v = data[field]
+                    if v == '' or v is None:
+                        data[field] = None
+                    elif isinstance(v, str):
+                        try:
+                            data[field] = int(float(v))
+                        except (ValueError, TypeError):
+                            data[field] = None
+        return data
 
 
 class VoucherResponse(BaseModel):
