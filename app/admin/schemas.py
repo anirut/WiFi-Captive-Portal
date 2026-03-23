@@ -1,7 +1,7 @@
 from typing import Literal
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from app.core.models import PMSAdapterType, VoucherType
 
 
@@ -33,6 +33,14 @@ class VoucherCreate(BaseModel):
     max_uses: int = 1
     expires_at: datetime | None = None
 
+    @field_validator('duration_minutes', 'data_limit_mb', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        """Convert empty strings to None for optional int fields."""
+        if v == '' or v is None:
+            return None
+        return v
+
 
 class BatchVoucherCreate(BaseModel):
     type: str  # "time" | "data"
@@ -42,6 +50,14 @@ class BatchVoucherCreate(BaseModel):
     max_devices: int = 1
     expires_at: datetime | None = None
     count: int = Field(ge=1, le=100)
+
+    @field_validator('duration_minutes', 'data_limit_mb', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        """Convert empty strings to None for optional int fields."""
+        if v == '' or v is None:
+            return None
+        return v
 
 
 class VoucherResponse(BaseModel):
