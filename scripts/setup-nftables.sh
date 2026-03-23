@@ -92,14 +92,20 @@ table inet captive_portal {
         ip saddr @dns_bypass udp dport 53 dnat to $DNS_IP:53
         ip saddr @dns_bypass tcp dport 53 dnat to $DNS_IP:53
 
-        # Portal redirect for unauthenticated users
+        # Portal redirect for unauthenticated users (HTTP only)
         ip saddr != @whitelist tcp dport 80 dnat to $PORTAL_IP:$PORTAL_PORT
-        ip saddr != @whitelist tcp dport 443 dnat to $PORTAL_IP:$PORTAL_PORT
     }
 
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         oifname $WAN_IF ip saddr @whitelist masquerade
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+        # TCP RST for unauthenticated HTTPS — triggers browser captive portal detection
+        # Redirecting HTTPS to an HTTP port causes SSL error instead of captive portal
+        tcp dport 443 ct state new ip saddr != @whitelist reject with tcp reset
     }
 
     chain forward {
