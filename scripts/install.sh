@@ -59,13 +59,37 @@ echo "  Available interfaces:"
 ip -o link show | awk '{print "   ", NR".", $2}' | sed 's/://'
 echo ""
 
-ask "WiFi interface (AP/hotspot side) [wlan0]:"
-read -r WIFI_INTERFACE
-WIFI_INTERFACE="${WIFI_INTERFACE:-wlan0}"
+# Auto-detect WiFi interface (look for wireless drivers)
+DETECTED_WIFI=""
+for iface in $(ip link show | grep -oP '(?<=: )\w+(?=:)'); do
+    if ethtool -i "$iface" 2>/dev/null | grep -qE 'ath9k|mac80211|rtl|iwl|ath10k|brcmfmac|rtl8'; then
+        DETECTED_WIFI="$iface"
+        break
+    fi
+done
+WIFI_INTERFACE="${DETECTED_WIFI:-wlan0}"
+info "Detected WiFi interface (wireless driver): $WIFI_INTERFACE"
 
-ask "WAN interface (internet/uplink side) [eth0]:"
-read -r WAN_INTERFACE
-WAN_INTERFACE="${WAN_INTERFACE:-eth0}"
+# Auto-detect WAN interface (prefer wired if different from WiFi)
+DETECTED_WAN=""
+for iface in $(ip link show | grep -oP '(?<=: )\w+(?=:)'); do
+    if [ "$iface" != "lo" ] && [ "$iface" != "$WIFI_INTERFACE" ]; then
+        if ethtool -i "$iface" 2>/dev/null | grep -qE 'r8169|e1000|e1000e|igb|ixgbe'; then
+            DETECTED_WAN="$iface"
+            break
+        fi
+    fi
+done
+DETECTED_WAN="${DETECTED_WAN:-eth0}"
+info "Detected WAN interface: $DETECTED_WAN"
+
+ask "Confirm WiFi interface [$WIFI_INTERFACE]:"
+read -r WIFI_INPUT
+WIFI_INTERFACE="${WIFI_INPUT:-$WIFI_INTERFACE}"
+
+ask "Confirm WAN interface [$DETECTED_WAN]:"
+read -r WAN_INPUT
+WAN_INTERFACE="${WAN_INPUT:-$DETECTED_WAN}"
 
 ask "Portal gateway IP (this server's IP on WiFi network) [192.168.1.1]:"
 read -r PORTAL_IP
