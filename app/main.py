@@ -35,6 +35,15 @@ async def lifespan(app: FastAPI):
     except Exception as _e:
         import logging as _logging
         _logging.getLogger(__name__).warning(f"dnsmasq startup restore failed: {_e}")
+    # Load PMS adapter from DB on startup
+    try:
+        from app.core.database import AsyncSessionFactory
+        from app.pms.factory import load_adapter as _load_adapter
+        async with AsyncSessionFactory() as _db:
+            await _load_adapter(_db)
+    except Exception as _e:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(f"PMS adapter startup load failed: {_e}")
     start_scheduler()
     yield
     # Shutdown

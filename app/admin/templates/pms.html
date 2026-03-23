@@ -53,13 +53,39 @@
         <label class="block text-sm text-slate-400 mb-1">Adapter Type</label>
         <select name="type" x-model="pmsType"
                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white">
+          <option value="opera_fias">Opera FIAS (TCP)</option>
           <option value="opera_cloud">Opera Cloud</option>
           <option value="mews">Mews</option>
           <option value="standalone">Standalone</option>
         </select>
       </div>
 
-      <div x-show="pmsType !== 'standalone'" class="space-y-3">
+      <!-- Opera FIAS (TCP) fields -->
+      <div x-show="pmsType === 'opera_fias'" class="space-y-3">
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Host</label>
+          <input type="text" name="host" placeholder="127.0.0.1"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Port</label>
+          <input type="text" name="port" placeholder="9090"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Auth Key</label>
+          <input type="text" name="auth_key" placeholder="(leave blank if not required)"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+        <div>
+          <label class="block text-sm text-slate-400 mb-1">Vendor ID</label>
+          <input type="text" name="vendor_id" placeholder="wifi-portal"
+                 class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white"/>
+        </div>
+      </div>
+
+      <!-- Opera Cloud / Mews / other HTTP-based fields -->
+      <div x-show="pmsType !== 'standalone' && pmsType !== 'opera_fias'" class="space-y-3">
         <div>
           <label class="block text-sm text-slate-400 mb-1">Base URL</label>
           <input type="url" name="base_url" placeholder="https://api.example.com"
