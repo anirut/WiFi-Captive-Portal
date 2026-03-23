@@ -71,9 +71,8 @@ async def login_submit(request: Request, db: AsyncSession = Depends(get_db)):
     if parsed.scheme or parsed.netloc:
         next_url = "/admin/"
     resp = RedirectResponse(url=next_url, status_code=302)
-    # Fix 2: Set secure cookie flag based on environment
-    _secure = settings.ENVIRONMENT.lower() == "production"
-    resp.set_cookie("admin_token", token, httponly=True, samesite="lax", secure=_secure)
+    # Captive portal runs on HTTP (not HTTPS) — never set Secure flag
+    resp.set_cookie("admin_token", token, httponly=True, samesite="lax", secure=False)
     return resp
 
 

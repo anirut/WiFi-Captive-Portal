@@ -59,13 +59,13 @@ def write_config(config) -> None:
 
 
 def reload_dnsmasq() -> bool:
-    """Reload dnsmasq service. Returns True on success."""
+    """Restart dnsmasq to apply new config. Returns True on success."""
     try:
-        subprocess.run(["systemctl", "reload", "dnsmasq"], check=True, capture_output=True)
-        logger.info("dnsmasq reloaded")
+        subprocess.run(["systemctl", "restart", "dnsmasq"], check=True, capture_output=True)
+        logger.info("dnsmasq restarted")
         return True
     except subprocess.CalledProcessError as e:
-        logger.error(f"dnsmasq reload failed: {e.stderr}")
+        logger.error(f"dnsmasq restart failed: {e.stderr}")
         return False
 
 

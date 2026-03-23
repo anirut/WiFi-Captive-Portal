@@ -202,23 +202,26 @@ if [[ "$PYTHON_MAJOR" -lt 3 ]] || [[ "$PYTHON_MAJOR" -eq 3 && "$PYTHON_MINOR" -l
     success "Python 3.12 installed."
 else
     success "Python $PYTHON_VERSION already installed."
+    info "Ensuring python3-venv package is installed..."
+    apt-get install -y -qq "python3.${PYTHON_MINOR}-venv" python3-pip 2>/dev/null || \
+        apt-get install -y -qq python3-venv python3-pip
 fi
 
 # ── PostgreSQL (latest from official repo) ────────────────────────────────────
 if ! command -v psql &>/dev/null; then
-    info "Installing PostgreSQL 17 from official repo..."
+    info "Installing PostgreSQL 18 from official repo..."
 
     # Add PostgreSQL official APT repository
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
     echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 
     apt-get update -qq
-    apt-get install -y -qq postgresql-17 postgresql-contrib-17
+    apt-get install -y -qq postgresql-18 postgresql-contrib-18 postgresql-client-18
 
-    # Start PostgreSQL 17
+    # Start PostgreSQL 18
     systemctl enable postgresql
     systemctl start postgresql
-    success "PostgreSQL 17 installed and started."
+    success "PostgreSQL 18 installed and started."
 else
     PG_VER=$(psql --version | awk '{print $3}' | cut -d. -f1)
     success "PostgreSQL $PG_VER already installed."
@@ -339,7 +342,8 @@ step "INSTALLING PYTHON DEPENDENCIES"
 
 VENV_DIR="$APP_DIR/.venv"
 
-if [[ ! -d "$VENV_DIR" ]]; then
+if [[ ! -d "$VENV_DIR" ]] || [[ ! -f "$VENV_DIR/bin/pip" ]]; then
+    [[ -d "$VENV_DIR" ]] && { info "Removing broken virtual environment..."; rm -rf "$VENV_DIR"; }
     info "Creating virtual environment at $VENV_DIR..."
     python3 -m venv "$VENV_DIR"
 fi
@@ -444,17 +448,17 @@ step "CREATING ADMIN USER"
 info "Creating admin user '$ADMIN_USER'..."
 "$VENV_DIR/bin/python" - <<PYEOF
 import asyncio, os, sys
+import bcrypt as _bcrypt
 sys.path.insert(0, "$APP_DIR")
 os.chdir("$APP_DIR")
 
 async def create_admin():
     from app.core.database import AsyncSessionFactory
     from app.core.models import AdminUser, AdminRole
-    from passlib.context import CryptContext
     from sqlalchemy import select
 
-    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    hashed = pwd_ctx.hash("$ADMIN_PASS")
+    # Use bcrypt directly — must match router.py _verify_password()
+    hashed = _bcrypt.hashpw("$ADMIN_PASS".encode(), _bcrypt.gensalt()).decode()
 
     async with AsyncSessionFactory() as db:
         result = await db.execute(select(AdminUser).where(AdminUser.username == "$ADMIN_USER"))
@@ -476,6 +480,78 @@ asyncio.run(create_admin())
 PYEOF
 
 success "Admin user '$ADMIN_USER' ready."
+
+# =============================================================================
+# SECTION 7b: Create Default DHCP Configuration
+# =============================================================================
+step "CONFIGURING DEFAULT DHCP"
+
+info "Creating default DhcpConfig in database..."
+"$VENV_DIR/bin/python" - <<PYEOF
+import asyncio, os, sys, uuid
+from datetime import datetime, timezone
+sys.path.insert(0, "$APP_DIR")
+os.chdir("$APP_DIR")
+
+async def create_dhcp_config():
+    from app.core.database import AsyncSessionFactory
+    from app.core.models import DhcpConfig, DnsModeType
+    from sqlalchemy import select
+
+    # Derive subnet and DHCP range from portal IP
+    portal_parts = "$PORTAL_IP".split(".")
+    subnet_base = ".".join(portal_parts[:3])
+
+    async with AsyncSessionFactory() as db:
+        r = await db.execute(select(DhcpConfig))
+        existing = r.scalar_one_or_none()
+        if existing:
+            existing.interface = "$WIFI_INTERFACE"
+            existing.gateway_ip = "$PORTAL_IP"
+            existing.subnet = f"{subnet_base}.0/24"
+            existing.dhcp_range_start = f"{subnet_base}.10"
+            existing.dhcp_range_end = f"{subnet_base}.250"
+            existing.enabled = True
+            print("  DhcpConfig updated.")
+        else:
+            cfg = DhcpConfig(
+                id=uuid.uuid4(),
+                enabled=True,
+                interface="$WIFI_INTERFACE",
+                gateway_ip="$PORTAL_IP",
+                subnet=f"{subnet_base}.0/24",
+                dhcp_range_start=f"{subnet_base}.10",
+                dhcp_range_end=f"{subnet_base}.250",
+                lease_time="8h",
+                dns_upstream_1="8.8.8.8",
+                dns_upstream_2="8.8.4.4",
+                dns_mode=DnsModeType.redirect,
+                log_queries=False,
+                updated_at=datetime.now(timezone.utc),
+            )
+            db.add(cfg)
+            print("  DhcpConfig created.")
+        await db.commit()
+
+asyncio.run(create_dhcp_config())
+PYEOF
+
+success "DHCP configuration ready."
+
+# Persist portal IP on WiFi interface via netplan
+NETPLAN_FILE="/etc/netplan/55-captive-portal-lan.yaml"
+cat > "$NETPLAN_FILE" <<NPEOF
+network:
+  version: 2
+  ethernets:
+    $WIFI_INTERFACE:
+      dhcp4: false
+      addresses:
+        - $PORTAL_IP/24
+NPEOF
+chmod 600 "$NETPLAN_FILE"
+netplan apply 2>/dev/null || true
+info "Persistent IP $PORTAL_IP/24 configured on $WIFI_INTERFACE via netplan."
 
 # =============================================================================
 # SECTION 8: Network Rules (nftables + tc)

@@ -54,6 +54,16 @@ echo "  Portal: $PORTAL_IP:$PORTAL_PORT"
 echo "  WiFi interface: $WIFI_IF"
 echo "  WAN interface: $WAN_IF"
 
+# Bring WiFi interface up and ensure only portal IP is assigned
+ip link set "$WIFI_IF" up 2>/dev/null || true
+if ! ip addr show "$WIFI_IF" 2>/dev/null | grep -q "inet ${PORTAL_IP}/"; then
+    ip addr add "${PORTAL_IP}/24" dev "$WIFI_IF" 2>/dev/null || true
+    echo "  Assigned ${PORTAL_IP}/24 to $WIFI_IF"
+fi
+
+# Enable IP forwarding
+sysctl -qw net.ipv4.ip_forward=1
+
 # ── 1. Create nftables table ──────────────────────────────────────
 echo "[1/3] Creating nftables table..."
 
