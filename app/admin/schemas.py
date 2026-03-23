@@ -1,25 +1,8 @@
-from typing import Literal, Annotated
+from typing import Literal
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, Field, BeforeValidator, field_validator
+from pydantic import BaseModel, Field, field_validator
 from app.core.models import PMSAdapterType, VoucherType
-
-
-def coerce_int_or_none(v):
-    """Convert string numbers, empty strings, None to int or None."""
-    if v is None or v == '':
-        return None
-    if isinstance(v, str):
-        try:
-            return int(v)
-        except ValueError:
-            return None
-    return v
-
-
-# Type alias for integer fields that accept strings
-OptionalInt = Annotated[int | None, BeforeValidator(coerce_int_or_none)]
-RequiredInt = Annotated[int, BeforeValidator(coerce_int_or_none)]
 
 
 class PMSConfigResponse(BaseModel):
@@ -44,21 +27,51 @@ class PMSTestResult(BaseModel):
 
 class VoucherCreate(BaseModel):
     type: VoucherType
-    duration_minutes: OptionalInt = None
-    data_limit_mb: OptionalInt = None
-    max_devices: RequiredInt = 1
-    max_uses: RequiredInt = 1
+    duration_minutes: int | None = None
+    data_limit_mb: int | None = None
+    max_devices: int = 1
+    max_uses: int = 1
     expires_at: datetime | None = None
+
+    @field_validator(
+        'duration_minutes', 'data_limit_mb', 'max_devices', 'max_uses',
+        mode='before'
+    )
+    @classmethod
+    def coerce_int_fields(cls, v):
+        if v == '' or v is None:
+            return None
+        if isinstance(v, str):
+            try:
+                return int(float(v))
+            except (ValueError, TypeError):
+                return None
+        return v
 
 
 class BatchVoucherCreate(BaseModel):
     type: str  # "time" | "data"
-    duration_minutes: OptionalInt = None
-    data_limit_mb: OptionalInt = None
-    max_uses: RequiredInt = 1
-    max_devices: RequiredInt = 1
+    duration_minutes: int | None = None
+    data_limit_mb: int | None = None
+    max_uses: int = 1
+    max_devices: int = 1
     expires_at: datetime | None = None
-    count: Annotated[int, Field(ge=1, le=100), BeforeValidator(coerce_int_or_none)]
+    count: int = Field(ge=1, le=100)
+
+    @field_validator(
+        'duration_minutes', 'data_limit_mb', 'max_uses', 'max_devices', 'count',
+        mode='before'
+    )
+    @classmethod
+    def coerce_int_fields(cls, v):
+        if v == '' or v is None:
+            return None
+        if isinstance(v, str):
+            try:
+                return int(float(v))
+            except (ValueError, TypeError):
+                return None
+        return v
 
 
 class VoucherResponse(BaseModel):
