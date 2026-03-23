@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# setup-nftables.sh - Initialize nftables + tc + flowtables for captive portal
+# setup-nftables.sh - Initialize nftables + tc for captive portal
 # Usage: sudo ./setup-nftables.sh [OPTIONS]
 #
 # Options:
@@ -80,11 +80,6 @@ table inet captive_portal {
         type ipv4_addr
     }
 
-    flowtable f {
-        hook ingress priority 0
-        devices = { $WIFI_IF, $WAN_IF }
-    }
-
     chain prerouting {
         type nat hook prerouting priority dstnat; policy accept;
 
@@ -110,7 +105,7 @@ table inet captive_portal {
 
     chain forward {
         type filter hook forward priority filter; policy drop;
-        ct state established,related flow add @f accept
+        ct state established,related accept
         ip saddr @whitelist accept
         reject with icmp type host-unreachable
     }
@@ -170,5 +165,5 @@ fi
 
 echo ""
 echo "=========================================="
-echo "✓ nftables + flowtables + tc initialized"
+echo "✓ nftables + tc initialized"
 echo "=========================================="
