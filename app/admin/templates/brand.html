@@ -9,7 +9,7 @@
   <!-- Brand Settings -->
   <div class="card">
     <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 20px; color: #f1f5f9;">Hotel Settings</h3>
-    <form hx-put="/admin/api/brand" hx-target="#brand-result" class="space-y-4">
+    <form hx-put="/admin/api/brand" hx-target="#brand-result" hx-ext="json-enc" class="space-y-4">
       <div class="form-group">
         <label>Hotel Name</label>
         <input name="hotel_name" type="text" value="{{ brand.hotel_name if brand else 'Hotel WiFi' }}"/>
@@ -54,7 +54,7 @@
       <button @click="tab='th'" class="btn" :class="tab=='th' ? 'btn-primary' : 'btn-secondary'" style="text-decoration: none;">Thai</button>
       <button @click="tab='en'" class="btn" :class="tab=='en' ? 'btn-primary' : 'btn-secondary'" style="text-decoration: none;">English</button>
     </div>
-    <form hx-put="/admin/api/brand" hx-target="#tc-result" class="space-y-4">
+    <form hx-put="/admin/api/brand" hx-target="#tc-result" hx-ext="json-enc" class="space-y-4">
       <div x-show="tab=='th'" class="form-group">
         <label>Thai T&amp;C</label>
         <textarea name="tc_text_th" rows="8" style="resize: vertical;">{{ brand.tc_text_th if brand and brand.tc_text_th else '' }}</textarea>

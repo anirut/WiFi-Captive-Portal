@@ -19,6 +19,7 @@
         <select hx-put="/admin/api/rooms/{{ r.id }}/policy"
                 hx-target="#room-{{ r.id }}"
                 hx-include="this"
+                hx-ext="json-enc"
                 name="policy_id"
                 class="bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm">
           <option value="">None</option>

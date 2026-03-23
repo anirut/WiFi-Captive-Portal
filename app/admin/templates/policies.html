@@ -17,7 +17,7 @@
   </div>
 
   <div x-show="open" class="mb-6 p-4 bg-rgba(59, 130, 246, 0.05) border border-rgba(59, 130, 246, 0.2) rounded-8" style="display: none;">
-    <form hx-post="/admin/api/policies" hx-target="#policy-list" hx-swap="innerHTML" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <form hx-post="/admin/api/policies" hx-target="#policy-list" hx-swap="innerHTML" hx-ext="json-enc" class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <input name="name" placeholder="Policy name" required />
       <input name="bandwidth_up_kbps" type="number" placeholder="Upload speed (kbps)" value="0"/>
       <input name="bandwidth_down_kbps" type="number" placeholder="Download speed (kbps)" value="0"/>
