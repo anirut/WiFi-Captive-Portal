@@ -11,6 +11,7 @@ This module provides the entry point for the FIAS Emulator, including:
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import Depends, FastAPI, Request
@@ -34,8 +35,7 @@ fias_task: asyncio.Task | None = None
 # SSE subscribers for activity feed
 _sse_subscribers: list[asyncio.Queue] = []
 
-# Templates directory (will be created in Task 5)
-templates = Jinja2Templates(directory="emulator/templates")
+templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
 async def broadcast_activity(activity: ActivityLog) -> None:
@@ -187,8 +187,7 @@ async def dashboard(request: Request):
                 select(Scenario.name).where(Scenario.is_active == True)
             )
 
-        context = {
-            "request": request,
+        return templates.TemplateResponse(request, "dashboard.html", {
             "tcp_port": settings.fias_tcp_port,
             "connection_count": connection_count,
             "total_connections": total_connections,
@@ -196,8 +195,7 @@ async def dashboard(request: Request):
             "active_guest_count": active_guest_count,
             "scenario_count": scenario_count,
             "active_scenario": active_scenario or "None",
-        }
-        return templates.TemplateResponse("dashboard.html", context)
+        })
     except Exception as e:
         logger.error(f"Error rendering dashboard: {e}")
         return HTMLResponse(
@@ -221,8 +219,7 @@ async def guests_page(request: Request, db: AsyncSession = Depends(get_db)):
     """Guests management page fragment."""
     try:
         scenarios = (await db.execute(select(Scenario))).scalars().all()
-        return templates.TemplateResponse("pages/guests.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "pages/guests.html", {
             "scenarios": scenarios,
         })
     except Exception as e:
@@ -234,7 +231,7 @@ async def guests_page(request: Request, db: AsyncSession = Depends(get_db)):
 async def scenarios_page(request: Request):
     """Scenarios management page fragment."""
     try:
-        return templates.TemplateResponse("pages/scenarios.html", {"request": request})
+        return templates.TemplateResponse(request, "pages/scenarios.html")
     except Exception:
         return HTMLResponse(content="<p>Scenarios page - templates coming in Task 5</p>")
 
@@ -244,8 +241,7 @@ async def failure_rules_page(request: Request, db: AsyncSession = Depends(get_db
     """Failure rules management page fragment."""
     try:
         scenarios = (await db.execute(select(Scenario))).scalars().all()
-        return templates.TemplateResponse("pages/failure_rules.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "pages/failure_rules.html", {
             "scenarios": scenarios,
         })
     except Exception as e:
@@ -257,7 +253,7 @@ async def failure_rules_page(request: Request, db: AsyncSession = Depends(get_db
 async def connections_page(request: Request):
     """Connections page fragment."""
     try:
-        return templates.TemplateResponse("pages/connections.html", {"request": request})
+        return templates.TemplateResponse(request, "pages/connections.html")
     except Exception:
         return HTMLResponse(content="<p>Connections page - templates coming in Task 5</p>")
 
@@ -266,7 +262,7 @@ async def connections_page(request: Request):
 async def activity_page(request: Request):
     """Activity log page fragment."""
     try:
-        return templates.TemplateResponse("pages/activity.html", {"request": request})
+        return templates.TemplateResponse(request, "pages/activity.html")
     except Exception:
         return HTMLResponse(content="<p>Activity page - templates coming in Task 5</p>")
 
