@@ -8,17 +8,7 @@
   <!-- Create Single Voucher -->
   <div class="card">
     <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 20px; color: #f1f5f9;">Create Voucher</h3>
-    <form hx-post="/admin/vouchers" hx-target="#voucher-result" hx-ext="json-enc" hx-on::before-request="
-      // Convert empty strings to null for optional fields
-      const data = event.detail.xhr.body;
-      if (data) {
-        const obj = JSON.parse(data);
-        if (obj.duration_minutes === '' || obj.duration_minutes === null) obj.duration_minutes = null;
-        if (obj.data_limit_mb === '' || obj.data_limit_mb === null) obj.data_limit_mb = null;
-        if (obj.max_devices === '') obj.max_devices = 1;
-        event.detail.xhr.body = JSON.stringify(obj);
-      }
-    " class="space-y-4">
+    <form hx-post="/admin/vouchers" hx-target="#voucher-result" hx-ext="json-enc" class="space-y-4">
       <div x-data="{vtype:'time'}">
         <label>Type</label>
         <select name="type" x-model="vtype">
@@ -51,17 +41,7 @@
   <!-- Batch Generate -->
   <div class="card">
     <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 20px; color: #f1f5f9;">Batch Generate</h3>
-    <form hx-post="/admin/vouchers/batch" hx-target="#batch-result" hx-ext="json-enc" hx-on::before-request="
-      // Convert empty strings to null for optional fields
-      const data = event.detail.xhr.body;
-      if (data) {
-        const obj = JSON.parse(data);
-        if (obj.duration_minutes === '' || obj.duration_minutes === null) obj.duration_minutes = null;
-        if (obj.data_limit_mb === '' || obj.data_limit_mb === null) obj.data_limit_mb = null;
-        if (obj.max_devices === '') obj.max_devices = 1;
-        event.detail.xhr.body = JSON.stringify(obj);
-      }
-    " class="space-y-4">
+    <form hx-post="/admin/vouchers/batch" hx-target="#batch-result" hx-ext="json-enc" class="space-y-4">
       <input name="type" type="hidden" value="time"/>
       <div class="form-group">
         <label>Duration (minutes)</label>

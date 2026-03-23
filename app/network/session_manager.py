@@ -24,6 +24,7 @@ class SessionManager:
         guest_id: uuid.UUID | None = None,
         voucher_id: uuid.UUID | None = None,
     ) -> Session:
+        logger.info(f"create_session: starting for IP {ip}")
         mac = get_mac_for_ip(ip)
         session = Session(
             ip_address=ip,
@@ -37,7 +38,9 @@ class SessionManager:
         db.add(session)
         await db.commit()
         await db.refresh(session)
+        logger.info(f"create_session: DB record created for {ip}, calling nft.create_session_rules()")
         nft.create_session_rules(ip)
+        logger.info(f"create_session: nft rules created, applying bandwidth limits")
         apply_bandwidth_limit(ip, bandwidth_up_kbps, bandwidth_down_kbps, self.wan_if)
         logger.info(f"Session created: {session.id} for {ip}")
         return session

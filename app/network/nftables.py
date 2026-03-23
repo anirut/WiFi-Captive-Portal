@@ -18,12 +18,16 @@ class NftablesManager:
     @staticmethod
     def _run(args: list[str], check: bool = True) -> Optional[str]:
         """Execute nft command."""
+        cmd = ["nft"] + args
+        logger.debug(f"nftables: executing: {' '.join(cmd)}")
         result = subprocess.run(
-            ["nft"] + args,
+            cmd,
             check=check,
             capture_output=True,
             text=True
         )
+        if result.returncode != 0:
+            logger.warning(f"nftables command returned {result.returncode}: {result.stderr}")
         return result.stdout if result.returncode == 0 else None
 
     # ── Whitelist Operations ─────────────────────────────────────────
@@ -32,10 +36,14 @@ class NftablesManager:
     def add_to_whitelist(cls, ip: str) -> None:
         """Add IP to whitelist set."""
         try:
+            logger.debug(f"nftables: attempting to add {ip} to whitelist")
             cls._run(["add", "element", cls.TABLE, "whitelist", f"{{ {ip} }}"])
             logger.info(f"nftables: added {ip} to whitelist")
         except subprocess.CalledProcessError as e:
             logger.error(f"nftables add failed for {ip}: {e.stderr}")
+            raise
+        except Exception as e:
+            logger.error(f"nftables add failed with unexpected error for {ip}: {type(e).__name__}: {e}")
             raise
 
     @classmethod
@@ -91,6 +99,7 @@ class NftablesManager:
     @classmethod
     def create_session_rules(cls, ip: str) -> None:
         """Add to both whitelist + dns_bypass sets."""
+        logger.info(f"nftables: creating session rules for {ip}")
         cls.add_to_whitelist(ip)
         cls.add_dns_bypass(ip)
         logger.info(f"nftables: created session rules for {ip}")
