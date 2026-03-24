@@ -13,8 +13,23 @@
 <div x-data="{ editing: false }">
 
   <!-- Current Configuration Card -->
-  <div class="glass rounded-xl p-6 mb-6" x-data="{ status: null, loading: false }"
-       @load="async () => { loading = true; const r = await fetch('/admin/pms/health'); const d = await r.json(); status = d.ok ? 'connected' : 'error'; loading = false; }">
+  <div class="glass rounded-xl p-6 mb-6" x-data="{
+    status: null,
+    loading: false,
+    async checkStatus() {
+      this.loading = true;
+      try {
+        const r = await fetch('/admin/pms/health');
+        const d = await r.json();
+        this.status = d.ok ? 'connected' : 'error';
+      } catch(e) {
+        this.status = 'error';
+      }
+      this.loading = false;
+    }
+  }"
+       x-init="checkStatus()"
+       @pms-config-saved="checkStatus()">
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-3">
         <h3 class="text-lg font-semibold text-white">Current Configuration</h3>
@@ -60,7 +75,7 @@
   <div x-show="editing" x-cloak class="glass rounded-xl p-6 mb-6">
     <h3 class="text-lg font-semibold text-white mb-4">Edit PMS Configuration</h3>
     <form hx-put="/admin/pms" hx-target="#pms-response" hx-ext="json-enc"
-          @htmx:afterSwap="setTimeout(() => { window.dispatchEvent(new Event('load')); }, 200)"
+          @htmx:afterSwap="document.querySelector('[x-data*=\"checkStatus\"]').dispatchEvent(new CustomEvent('pms-config-saved', { bubbles: true }))"
           class="space-y-4" x-data="{ pmsType: '{{ adapter_type or 'standalone' }}' }">
 
       <div>
