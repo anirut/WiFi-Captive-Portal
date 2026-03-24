@@ -51,13 +51,13 @@ class SessionManager:
                     existing_session.ip_address = ip
                     await db.commit()
                     nft.create_session_rules(ip)
-                    apply_bandwidth_limit(ip, existing_session.bandwidth_up_kbps, existing_session.bandwidth_down_kbps, self.wan_if)
+                    apply_bandwidth_limit(ip, existing_session.bandwidth_up_kbps, 0, self.wan_if)
                     logger.info(f"Session {existing_session.id} updated with new IP {ip}")
                 else:
                     logger.info(f"MAC {mac} reconnected with same IP {ip} - reusing session, refreshing nft rules")
                     # Always re-apply nftables rules in case service restarted and rules were wiped
                     nft.create_session_rules(ip)
-                    apply_bandwidth_limit(ip, existing_session.bandwidth_up_kbps, existing_session.bandwidth_down_kbps, self.wan_if)
+                    apply_bandwidth_limit(ip, existing_session.bandwidth_up_kbps, 0, self.wan_if)
                 return existing_session
 
         # No existing session for this MAC - create new session
