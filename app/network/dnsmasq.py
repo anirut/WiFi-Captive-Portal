@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 CONF_FILE = "/etc/dnsmasq.d/captive-portal.conf"
+AUTH_CONF_FILE = "/etc/dnsmasq-auth.conf"
 LEASES_FILE = "/var/lib/misc/dnsmasq.leases"
 
 
@@ -72,6 +73,28 @@ def write_config(config) -> None:
         f.write(content)
     logger.info(f"dnsmasq config written to {CONF_FILE}")
 
+    # Write auth dnsmasq config (port 5354, for authenticated/dns_bypass clients)
+    auth_lines = [
+        "# Managed by WiFi Captive Portal — do not edit manually",
+        "# Auth DNS: resolves logout shortcuts, forwards everything else upstream.",
+        f"port=5354",
+        f"listen-address={config.gateway_ip}",
+        "bind-interfaces",
+        "no-resolv",
+        "",
+        "# Upstream DNS for real domains",
+        f"server={config.dns_upstream_1}",
+        f"server={config.dns_upstream_2}",
+        "",
+        "# Logout shortcut hostnames",
+        f"address=/logout.wifi/{config.gateway_ip}",
+        f"address=/logout/{config.gateway_ip}",
+    ]
+    auth_content = "\n".join(auth_lines) + "\n"
+    with open(AUTH_CONF_FILE, "w") as f:
+        f.write(auth_content)
+    logger.info(f"dnsmasq-auth config written to {AUTH_CONF_FILE}")
+
 
 def reload_dnsmasq() -> bool:
     """Restart dnsmasq to apply new config. Returns True on success."""
@@ -81,6 +104,17 @@ def reload_dnsmasq() -> bool:
         return True
     except subprocess.CalledProcessError as e:
         logger.error(f"dnsmasq restart failed: {e.stderr}")
+        return False
+
+
+def reload_auth_dnsmasq() -> bool:
+    """Restart dnsmasq-auth (port 5354) to apply new config. Returns True on success."""
+    try:
+        subprocess.run(["systemctl", "restart", "dnsmasq-auth"], check=True, capture_output=True)
+        logger.info("dnsmasq-auth restarted")
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error(f"dnsmasq-auth restart failed: {e.stderr}")
         return False
 
 

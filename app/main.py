@@ -12,7 +12,6 @@ from app.pms.webhook_router import router as webhook_router
 from app.network.scheduler import start_scheduler, stop_scheduler
 from app.network.tc import ensure_ifb_ready
 from app.network.https_redirect import start_https_redirect_server
-from app.network.dns_proxy import start_auth_dns_proxy
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,14 +28,7 @@ async def lifespan(app: FastAPI):
     except Exception as _e:
         import logging as _logging
         _logging.getLogger(__name__).warning(f"HTTPS redirect server failed to start: {_e}")
-    # Auth DNS proxy — handles 'logout' resolution for authenticated (dns_bypass) clients
-    _dns_proxy = None
-    try:
-        _dns_proxy = await start_auth_dns_proxy(settings.PORTAL_IP, settings.DNS_UPSTREAM_IP)
-    except Exception as _e:
-        import logging as _logging
-        _logging.getLogger(__name__).warning(f"Auth DNS proxy failed to start: {_e}")
-    # Restore dnsmasq config from DB
+    # Restore dnsmasq config from DB (both main + auth instances)
     try:
         from app.core.database import AsyncSessionFactory
         from app.core.models import DhcpConfig
@@ -48,6 +40,7 @@ async def lifespan(app: FastAPI):
             if _dhcp and _dhcp.enabled:
                 _dnsmasq.write_config(_dhcp)
                 _dnsmasq.reload_dnsmasq()
+                _dnsmasq.reload_auth_dnsmasq()
     except Exception as _e:
         import logging as _logging
         _logging.getLogger(__name__).warning(f"dnsmasq startup restore failed: {_e}")
@@ -64,8 +57,6 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     stop_scheduler()
-    if _dns_proxy:
-        _dns_proxy.close()
     if _https_server:
         _https_server.close()
         await _https_server.wait_closed()

@@ -40,6 +40,24 @@ mkdir -p /etc/dnsmasq.d
 info "Enabling dnsmasq service..."
 systemctl enable dnsmasq
 
+info "Creating dnsmasq-auth service (port 5354, for authenticated clients)..."
+cat > /etc/systemd/system/dnsmasq-auth.service <<'EOF'
+[Unit]
+Description=WiFi Captive Portal Auth DNS (port 5354)
+After=network.target dnsmasq.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=/etc/dnsmasq-auth.conf
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable dnsmasq-auth
+
 # Prevent cloud-init from overwriting network config on reboot
 if [[ -d /etc/cloud/cloud.cfg.d ]]; then
     echo "network: {config: disabled}" > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
