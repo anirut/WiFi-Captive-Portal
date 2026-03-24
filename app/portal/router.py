@@ -4,7 +4,8 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select as sa_select
+from sqlalchemy import select as sa_select, cast
+from sqlalchemy.dialects.postgresql import MACADDR
 from app.core.database import get_db
 from app.core.config import settings
 from app.core.rate_limit import check_rate_limit, RateLimitExceeded
@@ -163,7 +164,7 @@ async def disconnect(request: Request, db: AsyncSession = Depends(get_db)):
     # This ensures device disconnects regardless of IP changes
     result = await db.execute(
         sa_select(Session).where(
-            Session.mac_address == mac,
+            Session.mac_address == cast(mac, MACADDR),
             Session.status == SessionStatus.active
         )
     )
