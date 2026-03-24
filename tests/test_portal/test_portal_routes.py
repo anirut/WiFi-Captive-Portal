@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from datetime import datetime, timedelta, timezone
 from app.pms.base import GuestInfo
+from app.core.models import SessionStatus
 
 @pytest.mark.asyncio
 async def test_get_portal_login_page(client):
@@ -106,3 +107,40 @@ async def test_auth_room_max_devices_reached(client):
 
         assert response.status_code == 429
         assert response.json()["detail"]["error"] == "max_devices_reached"
+
+
+@pytest.mark.asyncio
+async def test_portal_shows_disconnect_when_session_active(client):
+    """When client has an active session, GET / should show disconnect page."""
+    from datetime import datetime, timedelta, timezone
+    from app.core.models import Session, SessionStatus
+    from unittest.mock import patch, MagicMock
+
+    # Create a mock active session
+    mock_session = MagicMock()
+    mock_session.id = "session-uuid"
+    mock_session.expires_at = datetime.now(timezone.utc) + timedelta(hours=8)
+    mock_session.status = SessionStatus.active
+
+    # Mock get_mac_for_ip to return a MAC address
+    with patch("app.portal.router.get_mac_for_ip", return_value="aa:bb:cc:dd:ee:ff"):
+        # Override DB to return the mock session
+        from app.core.database import get_db
+        from app.main import app
+
+        async def mock_db_gen():
+            mock_db = AsyncMock()
+            mock_result = MagicMock()
+            mock_result.scalar_one_or_none.return_value = mock_session
+            mock_db.execute = AsyncMock(return_value=mock_result)
+            yield mock_db
+
+        app.dependency_overrides[get_db] = mock_db_gen
+
+        response = await client.get("/")
+
+        app.dependency_overrides.pop(get_db, None)
+
+        assert response.status_code == 200
+        # Check that we got the disconnect page, not login
+        assert "Disconnect" in response.text
