@@ -80,17 +80,36 @@ table inet captive_portal {
         type ipv4_addr
     }
 
+    # Well-known DoH (DNS-over-HTTPS) server IPs.
+    # Authenticated clients are blocked from reaching these so their OS/browser
+    # falls back to plain UDP port 53, which we intercept for 'logout' resolution.
+    set doh_servers {
+        type ipv4_addr
+        flags interval
+        elements = {
+            8.8.8.8, 8.8.4.4,              # Google
+            1.1.1.1, 1.0.0.1,              # Cloudflare
+            9.9.9.9, 149.112.112.112,       # Quad9
+            208.67.222.222, 208.67.220.220  # OpenDNS
+        }
+    }
+
     chain prerouting {
         type nat hook prerouting priority dstnat; policy accept;
 
-        # DNS bypass for authenticated users
-        ip saddr @dns_bypass udp dport 53 dnat to $DNS_IP:53
-        ip saddr @dns_bypass tcp dport 53 dnat to $DNS_IP:53
+        # DNS for authenticated users → auth DNS proxy (resolves 'logout', forwards rest to upstream)
+        ip saddr @dns_bypass udp dport 53 dnat to $PORTAL_IP:5354
+        ip saddr @dns_bypass tcp dport 53 dnat to $PORTAL_IP:5354
 
         # Force all unauthenticated DNS to local dnsmasq
         # (handles clients with hardcoded DNS like 8.8.8.8, 1.1.1.1)
         ip saddr != @dns_bypass udp dport 53 dnat to $PORTAL_IP:53
         ip saddr != @dns_bypass tcp dport 53 dnat to $PORTAL_IP:53
+
+        # http://logout and https://logout — let ALL clients reach the portal
+        # (authenticated/whitelisted clients would otherwise bypass the DNAT below)
+        ip daddr $PORTAL_IP tcp dport 80 dnat to $PORTAL_IP:$PORTAL_PORT
+        ip daddr $PORTAL_IP tcp dport 443 dnat to $PORTAL_IP:8443
 
         # Portal redirect for unauthenticated users (HTTP)
         ip saddr != @whitelist tcp dport 80 dnat to $PORTAL_IP:$PORTAL_PORT
@@ -111,6 +130,9 @@ table inet captive_portal {
     chain forward {
         type filter hook forward priority filter; policy drop;
         ct state established,related accept
+        # Block DoH to well-known servers for authenticated clients so their
+        # OS/browser falls back to plain DNS port 53 (intercepted → our proxy)
+        ip saddr @dns_bypass ip daddr @doh_servers tcp dport 443 reject with icmp type admin-prohibited
         ip saddr @whitelist accept
         reject with icmp type host-unreachable
     }

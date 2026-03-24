@@ -29,6 +29,7 @@ def test_write_config_redirect_mode():
         write_config(cfg)
     written = "".join(call.args[0] for call in m().write.call_args_list)
     assert "address=/#/192.168.0.1" in written
+    assert "address=/logout/192.168.0.1" in written
     assert "255.255.252.0" in written  # netmask derived from /22
     assert "log-dhcp" in written
     assert "log-queries" in written
@@ -42,6 +43,7 @@ def test_write_config_forward_mode():
         write_config(cfg)
     written = "".join(call.args[0] for call in m().write.call_args_list)
     assert "address=/#/" not in written
+    assert "address=/logout/192.168.0.1" in written  # logout always present
     assert "server=8.8.8.8" in written
 
 

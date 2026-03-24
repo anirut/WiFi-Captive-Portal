@@ -31,10 +31,25 @@ def write_config(config) -> None:
         f"dhcp-range={config.dhcp_range_start},{config.dhcp_range_end},{netmask},{config.lease_time}",
         f"dhcp-option=option:router,{config.gateway_ip}",
         f"dhcp-option=option:dns-server,{config.gateway_ip}",
+        # Search domain "wifi" lets clients resolve bare 'logout' by appending it:
+        # macOS/curl will try logout.wifi → resolves to portal IP.
+        "dhcp-option=option:domain-name,wifi",
+        "dhcp-option=option:domain-search,wifi",
         "",
         "# DNS upstream",
         f"server={config.dns_upstream_1}",
         f"server={config.dns_upstream_2}",
+    ]
+
+    # Logout shortcut hostnames — resolve to portal IP regardless of DNS mode.
+    # 'logout.wifi' (with dot) is the primary name: macOS/Chrome/Safari require
+    # at least one dot to treat a hostname as DNS rather than a search query.
+    # 'logout' (no dot) is kept as a fallback for Linux/Android curl/browsers.
+    lines += [
+        "",
+        "# Logout shortcut hostnames",
+        f"address=/logout.wifi/{config.gateway_ip}",
+        f"address=/logout/{config.gateway_ip}",
     ]
 
     if dns_mode == "redirect":
