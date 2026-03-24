@@ -154,9 +154,16 @@ async def portal_expired(request: Request):
 
 @router.post("/session/disconnect")
 async def disconnect(request: Request, db: AsyncSession = Depends(get_db)):
+    from app.network.arp import get_mac_for_ip
+
+    # Get MAC address of the current device
+    mac = get_mac_for_ip(request.client.host)
+
+    # Find and expire session by MAC address, not IP
+    # This ensures device disconnects regardless of IP changes
     result = await db.execute(
         sa_select(Session).where(
-            Session.ip_address == request.client.host,
+            Session.mac_address == mac,
             Session.status == SessionStatus.active
         )
     )
