@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 8
 
-    AUTH_RATE_LIMIT_ATTEMPTS: int = 5
+    AUTH_RATE_LIMIT_ATTEMPTS: int = 20
     AUTH_RATE_LIMIT_WINDOW_SECONDS: int = 600
 
 settings = Settings()
