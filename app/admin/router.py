@@ -240,6 +240,7 @@ async def test_pms_config(
 async def check_pms_health(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_admin),
+    request: Request = None,
 ):
     """Check health of currently configured PMS adapter."""
     result = await db.execute(
@@ -247,20 +248,33 @@ async def check_pms_health(
     )
     record = result.scalar_one_or_none()
     if not record or record.type == PMSAdapterType.standalone:
-        return PMSTestResult(ok=True, latency_ms=0.0)
-    config = decrypt_config(record.config_encrypted) if record.config_encrypted else {}
-    adapter_class = ADAPTER_MAP.get(record.type)
-    if not adapter_class:
-        return PMSTestResult(ok=False, latency_ms=0.0, error="unsupported_adapter_type")
-    adapter = adapter_class(config)
-    start = time.monotonic()
-    try:
-        ok = await adapter.health_check()
-        latency = (time.monotonic() - start) * 1000
-        return PMSTestResult(ok=ok, latency_ms=round(latency, 1))
-    except Exception as e:
-        latency = (time.monotonic() - start) * 1000
-        return PMSTestResult(ok=False, latency_ms=round(latency, 1), error=str(e))
+        test_result = PMSTestResult(ok=True, latency_ms=0.0)
+    else:
+        config = decrypt_config(record.config_encrypted) if record.config_encrypted else {}
+        adapter_class = ADAPTER_MAP.get(record.type)
+        if not adapter_class:
+            test_result = PMSTestResult(ok=False, latency_ms=0.0, error="unsupported_adapter_type")
+        else:
+            adapter = adapter_class(config)
+            start = time.monotonic()
+            try:
+                ok = await adapter.health_check()
+                latency = (time.monotonic() - start) * 1000
+                test_result = PMSTestResult(ok=ok, latency_ms=round(latency, 1))
+            except Exception as e:
+                latency = (time.monotonic() - start) * 1000
+                test_result = PMSTestResult(ok=False, latency_ms=round(latency, 1), error=str(e))
+
+    # Return HTML if this is an HTMX request
+    if request and request.headers.get("HX-Request") == "true":
+        if test_result.ok:
+            html = f'<div class="text-green-400">✓ Connected ({test_result.latency_ms}ms)</div>'
+        else:
+            error = test_result.error or "Unknown error"
+            html = f'<div class="text-red-400">✗ Connection failed: {error}</div>'
+        return HTMLResponse(content=html)
+
+    return test_result
 
 
 @router.post("/vouchers/batch")

@@ -139,45 +139,19 @@
   </div>
 
   <!-- Test Connection -->
-  <div class="glass rounded-xl p-6" x-data="{ testLoading: false, testResult: null }">
+  <div class="glass rounded-xl p-6" x-data="{ testResult: null }">
     <h3 class="text-lg font-semibold text-white mb-4">Test Connection</h3>
     <p class="text-slate-400 text-sm mb-4">
-      Verify that the PMS adapter can connect and respond to a health check.
+      Verify that the current PMS configuration can connect and respond to a health check.
     </p>
-    <button @click="async () => {
-              testLoading = true;
-              const form = editing ? document.querySelector('form') : null;
-              const type = form ? new FormData(form).get('type') : '{{ adapter_type or 'standalone' }}';
-              const config = {};
-              if (form) {
-                const data = new FormData(form);
-                for (let [k, v] of data) {
-                  if (k !== 'type' && v) config[k] = v;
-                }
-              }
-              const res = await fetch('/admin/pms/test', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({type, config})
-              });
-              testResult = await res.json();
-              testLoading = false;
-            }"
-            :disabled="testLoading"
-            class="px-6 py-2 rounded text-white font-medium disabled:opacity-50"
-            style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
-      <span x-show="!testLoading">Test Connection</span>
-      <span x-show="testLoading">Testing...</span>
+    <button hx-get="/admin/pms/health" hx-target="#test-result" hx-swap="innerHTML"
+            class="px-6 py-2 rounded text-white font-medium"
+            style="background:linear-gradient(135deg,#6366f1,#8b5cf6)"
+            hx-on::htmx:beforeRequest="this.disabled=true"
+            hx-on::htmx:afterSwap="this.disabled=false">
+      Test Connection
     </button>
-    <div class="mt-4 text-sm">
-      <div x-show="testResult" :class="{
-        'text-green-400': testResult?.ok,
-        'text-red-400': !testResult?.ok
-      }">
-        <span x-show="testResult?.ok">✓ Connected (<span x-text="testResult?.latency_ms"></span>ms)</span>
-        <span x-show="!testResult?.ok">✗ Connection failed: <span x-text="testResult?.error || 'Unknown error'"></span></span>
-      </div>
-    </div>
+    <div id="test-result" class="mt-4 text-sm"></div>
   </div>
 
 </div>
