@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#080d1a">
+  <title>Connected — {{ hotel_name|default('Hotel WiFi') }}</title>
+  <link rel="stylesheet" href="/static/css/portal.css">
+</head>
+<body>
+  <div class="portal-bg" aria-hidden="true"></div>
+
+  <main class="status-page">
+
+    <div class="status-icon success" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+
+    <h1 class="status-title">You're Connected</h1>
+    <p class="status-body">You're online at {{ hotel_name|default('the hotel') }}.</p>
+
+    <div class="session-info-card">
+      <div class="session-info-row">
+        <span class="label">Session expires</span>
+        <span class="value" id="expires-text">{{ expires_at.strftime('%H:%M') if expires_at else '—' }}</span>
+      </div>
+      <div class="session-info-row">
+        <span class="label">Status</span>
+        <span class="value" style="color: oklch(72% 0.14 160)">Active</span>
+      </div>
+    </div>
+
+    <button class="btn-disconnect" id="disconnect-btn" onclick="confirmDisconnect(event)">
+      Disconnect
+    </button>
+
+    <a class="btn-secondary" href="http://detectportal.firefox.com/canonical.html" onclick="window.open(this.href,'_blank');return false;">
+      Continue Browsing
+    </a>
+
+  </main>
+
+  <style>
+    .btn-disconnect {
+      margin-top: 2rem;
+      padding: 1rem 2.5rem;
+      background: oklch(65% 0.18 25 / 0.15);
+      border: 1px solid oklch(65% 0.18 25 / 0.4);
+      border-radius: 12px;
+      color: oklch(70% 0.15 25);
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-height: 56px;
+      animation: fadeUp 0.5s var(--ease-out-quart) 0.7s both;
+    }
+
+    .btn-disconnect:hover {
+      background: oklch(65% 0.18 25 / 0.25);
+      border-color: oklch(65% 0.18 25 / 0.6);
+    }
+
+    .btn-disconnect:active {
+      transform: scale(0.98);
+    }
+
+    .btn-disconnect.loading {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+  </style>
+
+  <script>
+    async function confirmDisconnect(e) {
+      e.preventDefault();
+      if (!confirm('Disconnect from WiFi?')) return;
+
+      const btn = document.getElementById('disconnect-btn');
+      btn.classList.add('loading');
+      btn.textContent = 'Disconnecting...';
+
+      try {
+        await fetch('/session/disconnect', { method: 'POST' });
+      } finally {
+        window.location.href = '/';
+      }
+    }
+  </script>
+</body>
+</html>
