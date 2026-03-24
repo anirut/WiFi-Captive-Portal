@@ -1,10 +1,13 @@
 import time
 import uuid
 import bcrypt as _bcrypt
+import logging
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 import os as _os
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -250,20 +253,29 @@ async def check_pms_health(
     if not record or record.type == PMSAdapterType.standalone:
         test_result = PMSTestResult(ok=True, latency_ms=0.0)
     else:
-        config = decrypt_config(record.config_encrypted) if record.config_encrypted else {}
-        adapter_class = ADAPTER_MAP.get(record.type)
-        if not adapter_class:
-            test_result = PMSTestResult(ok=False, latency_ms=0.0, error="unsupported_adapter_type")
-        else:
-            adapter = adapter_class(config)
-            start = time.monotonic()
-            try:
-                ok = await adapter.health_check()
-                latency = (time.monotonic() - start) * 1000
-                test_result = PMSTestResult(ok=ok, latency_ms=round(latency, 1))
-            except Exception as e:
-                latency = (time.monotonic() - start) * 1000
-                test_result = PMSTestResult(ok=False, latency_ms=round(latency, 1), error=str(e))
+        try:
+            config = decrypt_config(record.config_encrypted) if record.config_encrypted else {}
+            adapter_class = ADAPTER_MAP.get(record.type)
+            if not adapter_class:
+                error_msg = f"unsupported_adapter_type: {record.type}"
+                logger.error(f"PMS health check failed: {error_msg}")
+                test_result = PMSTestResult(ok=False, latency_ms=0.0, error=error_msg)
+            else:
+                adapter = adapter_class(config)
+                start = time.monotonic()
+                try:
+                    ok = await adapter.health_check()
+                    latency = (time.monotonic() - start) * 1000
+                    test_result = PMSTestResult(ok=ok, latency_ms=round(latency, 1))
+                except Exception as e:
+                    latency = (time.monotonic() - start) * 1000
+                    error_msg = str(e) if str(e) else f"{type(e).__name__}"
+                    logger.error(f"PMS health check failed: {error_msg}", exc_info=True)
+                    test_result = PMSTestResult(ok=False, latency_ms=round(latency, 1), error=error_msg)
+        except Exception as e:
+            error_msg = str(e) if str(e) else f"{type(e).__name__}"
+            logger.error(f"PMS health check error: {error_msg}", exc_info=True)
+            test_result = PMSTestResult(ok=False, latency_ms=0.0, error=error_msg)
 
     # Return HTML if this is an HTMX request
     if request and request.headers.get("HX-Request") == "true":
