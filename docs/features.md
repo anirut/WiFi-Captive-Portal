@@ -87,6 +87,29 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 - ใส่ bandwidth limit ผ่าน tc (Linux Traffic Control) — ทั้ง **Download** และ **Upload**
 - เพิ่ม DNS bypass rule สำหรับ authenticated guests (redirect mode)
 
+#### MAC-Based Session Persistence (Device Reconnection)
+ระบบติดตามอุปกรณ์จาก **MAC address** แทน IP address เพื่อให้ผู้ใช้ไม่ต้อง login ใหม่เมื่อ reconnect:
+
+**Scenario 1: Device reconnect with same IP**
+- Device A login → IP 50, MAC aa:bb:cc:dd:ee:ff
+- Device A ปิดแล้วเปิดใหม่ → ได้ IP 50 เดิม
+- ระบบค้นหา session โดย MAC → พบ active session
+- ✓ ไม่ต้อง login (reuse existing session)
+
+**Scenario 2: Device reconnect with different IP (DHCP change)**
+- Device A login → IP 50, MAC aa:bb:cc:dd:ee:ff
+- Device A ปิด → เบา ๆ แล้วเปิดใหม่ → ได้ IP 100 (DHCP recycle)
+- ระบบค้นหา session โดย MAC → พบ active session
+- อัปเดต IP: 50 → 100, nftables rules, tc rules ทั้งหมด
+- ✓ ไม่ต้อง login (seamless reconnection)
+
+**Scenario 3: Multiple devices on same IP (edge case)**
+- Device A login → IP 50, MAC aa:bb
+- Device B connect → ได้ IP 50 (DHCP recycle)
+- Device A: MAC aa:bb มี active session → ยังใช้งานได้
+- Device B: MAC 11:22 ไม่มี session → ต้อง login
+- ✓ ระบบตรวจสอบจาก MAC ไม่ใช่ IP → ไม่ kick Device A
+
 #### การหมดอายุ Session
 | วิธี | รายละเอียด |
 |------|-----------|
