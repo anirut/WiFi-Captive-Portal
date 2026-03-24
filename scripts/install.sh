@@ -39,9 +39,14 @@ echo "  Phase 2 — Full Stack Setup"
 echo ""
 
 # ── detect install directory ─────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_DIR="$(dirname "$SCRIPT_DIR")"
+# ── fixed install directory ─────────────────────────────────────────────────
+APP_DIR="/opt/wifi-portal"
+SCRIPT_DIR="/opt/wifi-portal/scripts"
 info "Application directory: $APP_DIR"
+
+# Create install directory if it doesn't exist
+mkdir -p "$APP_DIR"
+info "Created/verified installation directory: $APP_DIR"
 
 # =============================================================================
 # SECTION 1: Interactive Configuration
@@ -360,6 +365,26 @@ fi
 success "Database configured."
 
 # =============================================================================
+# SECTION 3.5: Copy Application Files
+# =============================================================================
+step "COPYING APPLICATION FILES"
+
+# Get the directory where this script is located
+SCRIPT_SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_SOURCE_DIR="$(dirname "$SCRIPT_SOURCE_DIR")"
+
+info "Copying application files from $APP_SOURCE_DIR to $APP_DIR..."
+if [[ -d "$APP_SOURCE_DIR" ]]; then
+    # Copy all application files except .venv, tests, and build artifacts
+    rsync -av --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' \
+          --exclude='tests' --exclude='.git' --exclude='.worktrees' \
+          "$APP_SOURCE_DIR/" "$APP_DIR/" >/dev/null 2>&1
+    success "Application files copied to $APP_DIR"
+else
+    error "Source application directory not found at $APP_SOURCE_DIR"
+fi
+
+# =============================================================================
 # SECTION 4: Python Virtual Environment & Dependencies
 # =============================================================================
 step "INSTALLING PYTHON DEPENDENCIES"
@@ -651,6 +676,11 @@ echo ""
 echo "  Portal URL:    http://$PORTAL_IP:$PORTAL_PORT"
 echo "  Admin URL:     http://$PORTAL_IP:$PORTAL_PORT/admin"
 echo "  Admin login:   $ADMIN_USER"
+echo ""
+echo "  Installation Directory:  $APP_DIR"
+echo "  Application Files:        $APP_DIR/"
+echo "  Scripts:                  $SCRIPT_DIR/"
+echo "  Virtual Environment:      $VENV_DIR/"
 echo ""
 echo "  Service:       systemctl status captive-portal"
 echo "  Logs:          journalctl -u captive-portal -f"
