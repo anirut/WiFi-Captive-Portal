@@ -123,7 +123,7 @@ async def test_portal_shows_disconnect_when_session_active(client):
     mock_session.status = SessionStatus.active
 
     # Mock get_mac_for_ip to return a MAC address
-    with patch("app.portal.router.get_mac_for_ip", return_value="aa:bb:cc:dd:ee:ff"):
+    with patch("app.network.arp.get_mac_for_ip", return_value="aa:bb:cc:dd:ee:ff"):
         # Override DB to return the mock session
         from app.core.database import get_db
         from app.main import app

@@ -25,7 +25,25 @@ async def _get_redis(request: Request):
     return request.app.state.redis
 
 @router.get("/", response_class=HTMLResponse)
-async def portal_login(request: Request):
+async def portal_login(request: Request, db: AsyncSession = Depends(get_db)):
+    from app.network.arp import get_mac_for_ip
+
+    # Check if client already has an active session
+    mac = get_mac_for_ip(request.client.host)
+    if mac:
+        result = await db.execute(
+            sa_select(Session).where(
+                cast(Session.mac_address, String) == mac,
+                Session.status == SessionStatus.active
+            )
+        )
+        active_session = result.scalar_one_or_none()
+        if active_session:
+            return templates.TemplateResponse(
+                request, "disconnect.html",
+                {"expires_at": active_session.expires_at}
+            )
+
     return templates.TemplateResponse(request, "login.html")
 
 @router.post("/auth/room")
