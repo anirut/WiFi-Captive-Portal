@@ -26,6 +26,37 @@ class SessionManager:
     ) -> Session:
         logger.info(f"create_session: starting for IP {ip}")
         mac = get_mac_for_ip(ip)
+
+        # Check if this MAC address already has an active session
+        if mac:
+            result = await db.execute(
+                select(Session).where(
+                    Session.mac_address == mac,
+                    Session.status == SessionStatus.active,
+                    Session.expires_at > datetime.now(timezone.utc),
+                )
+            )
+            existing_session = result.scalar_one_or_none()
+
+            if existing_session:
+                old_ip = str(existing_session.ip_address)
+                # MAC reconnected with a different IP - update the session
+                if old_ip != ip:
+                    logger.info(f"MAC {mac} reconnected with new IP: {old_ip} → {ip}")
+                    # Remove old nftables rules and apply new ones
+                    nft.remove_session_rules(old_ip)
+                    remove_bandwidth_limit(old_ip, existing_session.bandwidth_up_kbps, self.wan_if)
+                    # Apply new IP rules
+                    existing_session.ip_address = ip
+                    await db.commit()
+                    nft.create_session_rules(ip)
+                    apply_bandwidth_limit(ip, existing_session.bandwidth_up_kbps, existing_session.bandwidth_down_kbps, self.wan_if)
+                    logger.info(f"Session {existing_session.id} updated with new IP {ip}")
+                else:
+                    logger.info(f"MAC {mac} reconnected with same IP {ip} - reusing session")
+                return existing_session
+
+        # No existing session for this MAC - create new session
         session = Session(
             ip_address=ip,
             mac_address=mac,
