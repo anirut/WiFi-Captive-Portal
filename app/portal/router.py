@@ -181,11 +181,14 @@ def _portal_redirect(request: Request) -> RedirectResponse:
 
 
 @router.get("/generate_204")           # Android / Chrome
+@router.get("/gen_204")               # Android / Chrome (alternative)
 @router.get("/hotspot-detect.html")    # Apple iOS / macOS
 @router.get("/library/test/success.html")  # Apple (legacy)
 @router.get("/connecttest.txt")        # Windows NCSI
 @router.get("/ncsi.txt")              # Windows (legacy)
-@router.get("/redirect")              # Generic
+@router.get("/redirect")              # Windows NCSI redirect
+@router.get("/canonical.html")        # Firefox 89+
+@router.get("/success.txt")           # Firefox (legacy)
 async def captive_portal_probe(request: Request):
     return _portal_redirect(request)
 

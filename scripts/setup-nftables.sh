@@ -87,6 +87,11 @@ table inet captive_portal {
         ip saddr @dns_bypass udp dport 53 dnat to $DNS_IP:53
         ip saddr @dns_bypass tcp dport 53 dnat to $DNS_IP:53
 
+        # Force all unauthenticated DNS to local dnsmasq
+        # (handles clients with hardcoded DNS like 8.8.8.8, 1.1.1.1)
+        ip saddr != @dns_bypass udp dport 53 dnat to $PORTAL_IP:53
+        ip saddr != @dns_bypass tcp dport 53 dnat to $PORTAL_IP:53
+
         # Portal redirect for unauthenticated users (HTTP only)
         ip saddr != @whitelist tcp dport 80 dnat to $PORTAL_IP:$PORTAL_PORT
     }
