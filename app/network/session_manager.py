@@ -46,8 +46,9 @@ class SessionManager:
         return session
 
     async def expire_session(self, db: AsyncSession, session: Session, status: SessionStatus = SessionStatus.expired) -> None:
-        nft.remove_session_rules(session.ip_address)
-        remove_bandwidth_limit(session.ip_address, session.bandwidth_up_kbps, self.wan_if)
+        ip_str = str(session.ip_address)  # INET column returns IPv4Address via asyncpg
+        nft.remove_session_rules(ip_str)
+        remove_bandwidth_limit(ip_str, session.bandwidth_up_kbps, self.wan_if)
         session.status = status
         await db.commit()
         logger.info(f"Session {session.id} expired ({status.value})")

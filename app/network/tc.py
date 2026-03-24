@@ -5,8 +5,8 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-def _ip_to_class_id(ip: str) -> str:
-    parts = ip.split(".")
+def _ip_to_class_id(ip) -> str:
+    parts = str(ip).split(".")
     numeric = int(parts[2]) * 256 + int(parts[3])
     return f"1:{numeric}"
 

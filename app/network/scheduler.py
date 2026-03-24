@@ -65,7 +65,7 @@ async def _bytes_job():
         )
         sessions = result.scalars().all()
         for s in sessions:
-            up, down = tc.get_bytes(s.ip_address)
+            up, down = tc.get_bytes(str(s.ip_address))  # INET column returns IPv4Address via asyncpg
             s.bytes_up = up
             s.bytes_down = down
             if s.voucher_id and s.voucher and s.voucher.type == VoucherType.data:
