@@ -2,8 +2,7 @@ import uuid
 import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, cast
-from sqlalchemy.dialects.postgresql import MACADDR
+from sqlalchemy import select, cast, String
 from app.core.models import Session, SessionStatus, Guest
 from app.network.nftables import NftablesManager as nft
 from app.network.tc import apply_bandwidth_limit, remove_bandwidth_limit
@@ -32,7 +31,7 @@ class SessionManager:
         if mac:
             result = await db.execute(
                 select(Session).where(
-                    Session.mac_address == cast(mac, MACADDR),
+                    cast(Session.mac_address, String) == mac,
                     Session.status == SessionStatus.active,
                     Session.expires_at > datetime.now(timezone.utc),
                 )
