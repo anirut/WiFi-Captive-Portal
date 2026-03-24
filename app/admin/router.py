@@ -225,7 +225,34 @@ async def test_pms_config(
         return PMSTestResult(ok=False, latency_ms=0.0, error="unsupported_adapter_type")
     if body.type == PMSAdapterType.standalone:
         return PMSTestResult(ok=True, latency_ms=0.0)
-    adapter = adapter_class(body.config)
+    adapter = adapter_class(body.config or {})
+    start = time.monotonic()
+    try:
+        ok = await adapter.health_check()
+        latency = (time.monotonic() - start) * 1000
+        return PMSTestResult(ok=ok, latency_ms=round(latency, 1))
+    except Exception as e:
+        latency = (time.monotonic() - start) * 1000
+        return PMSTestResult(ok=False, latency_ms=round(latency, 1), error=str(e))
+
+
+@router.get("/pms/health", response_model=PMSTestResult)
+async def check_pms_health(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    """Check health of currently configured PMS adapter."""
+    result = await db.execute(
+        select(PMSAdapterModel).where(PMSAdapterModel.is_active == True)
+    )
+    record = result.scalar_one_or_none()
+    if not record or record.type == PMSAdapterType.standalone:
+        return PMSTestResult(ok=True, latency_ms=0.0)
+    config = decrypt_config(record.config_encrypted) if record.config_encrypted else {}
+    adapter_class = ADAPTER_MAP.get(record.type)
+    if not adapter_class:
+        return PMSTestResult(ok=False, latency_ms=0.0, error="unsupported_adapter_type")
+    adapter = adapter_class(config)
     start = time.monotonic()
     try:
         ok = await adapter.health_check()

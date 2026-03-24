@@ -13,9 +13,21 @@
 <div x-data="{ editing: false }">
 
   <!-- Current Configuration Card -->
-  <div class="glass rounded-xl p-6 mb-6">
+  <div class="glass rounded-xl p-6 mb-6" x-data="{ status: null, loading: false }"
+       @load="async () => { loading = true; const r = await fetch('/admin/pms/health'); const d = await r.json(); status = d.ok ? 'connected' : 'error'; loading = false; }">
     <div class="flex items-center justify-between mb-4">
-      <h3 class="text-lg font-semibold text-white">Current Configuration</h3>
+      <div class="flex items-center gap-3">
+        <h3 class="text-lg font-semibold text-white">Current Configuration</h3>
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full"
+               :class="{ 'bg-green-500': status === 'connected', 'bg-red-500': status === 'error', 'bg-slate-500': !status }"></div>
+          <span class="text-xs" :class="{ 'text-green-400': status === 'connected', 'text-red-400': status === 'error', 'text-slate-500': !status }">
+            <span x-show="status === 'connected'">Connected</span>
+            <span x-show="status === 'error'">Not connected</span>
+            <span x-show="!status">Checking...</span>
+          </span>
+        </div>
+      </div>
       <button @click="editing = true" x-show="!editing"
               class="px-4 py-1.5 rounded text-white text-sm font-medium"
               style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
@@ -48,6 +60,7 @@
   <div x-show="editing" x-cloak class="glass rounded-xl p-6 mb-6">
     <h3 class="text-lg font-semibold text-white mb-4">Edit PMS Configuration</h3>
     <form hx-put="/admin/pms" hx-target="#pms-response" hx-ext="json-enc"
+          @htmx:afterSwap="setTimeout(() => { window.dispatchEvent(new Event('load')); }, 200)"
           class="space-y-4" x-data="{ pmsType: '{{ adapter_type or 'standalone' }}' }">
 
       <div>
@@ -126,18 +139,45 @@
   </div>
 
   <!-- Test Connection -->
-  <div class="glass rounded-xl p-6">
+  <div class="glass rounded-xl p-6" x-data="{ testLoading: false, testResult: null }">
     <h3 class="text-lg font-semibold text-white mb-4">Test Connection</h3>
     <p class="text-slate-400 text-sm mb-4">
-      Verify that the current PMS adapter can connect and respond to a health check.
+      Verify that the PMS adapter can connect and respond to a health check.
     </p>
-    <button hx-post="/admin/pms/test" hx-target="#test-result"
-            hx-vals='{"type": "{{ adapter_type or "standalone" }}", "config": {}}'
-            class="px-6 py-2 rounded text-white font-medium"
+    <button @click="async () => {
+              testLoading = true;
+              const form = editing ? document.querySelector('form') : null;
+              const type = form ? new FormData(form).get('type') : '{{ adapter_type or 'standalone' }}';
+              const config = {};
+              if (form) {
+                const data = new FormData(form);
+                for (let [k, v] of data) {
+                  if (k !== 'type' && v) config[k] = v;
+                }
+              }
+              const res = await fetch('/admin/pms/test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type, config})
+              });
+              testResult = await res.json();
+              testLoading = false;
+            }"
+            :disabled="testLoading"
+            class="px-6 py-2 rounded text-white font-medium disabled:opacity-50"
             style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
-      Test Connection
+      <span x-show="!testLoading">Test Connection</span>
+      <span x-show="testLoading">Testing...</span>
     </button>
-    <div id="test-result" class="mt-4 text-sm"></div>
+    <div class="mt-4 text-sm">
+      <div x-show="testResult" :class="{
+        'text-green-400': testResult?.ok,
+        'text-red-400': !testResult?.ok
+      }">
+        <span x-show="testResult?.ok">✓ Connected (<span x-text="testResult?.latency_ms"></span>ms)</span>
+        <span x-show="!testResult?.ok">✗ Connection failed: <span x-text="testResult?.error || 'Unknown error'"></span></span>
+      </div>
+    </div>
   </div>
 
 </div>
