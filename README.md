@@ -19,6 +19,8 @@ A production-ready **Hotel WiFi Captive Portal** system with enterprise-grade fe
 - 🎫 **Voucher System** - PDF generation with QR codes
 - 🌐 **Multi-language Support** - Thai/English localization
 - 🔧 **GUI Installer** - PyQt6 desktop installer for easy deployment
+- 🔗 **Self-Service Disconnect** - Guests type `http://logout.wifi` to disconnect from any device
+- 🧬 **Dual DNS Architecture** - Separate dnsmasq instances for unauthenticated (port 53) and authenticated (port 5354) clients
 
 ---
 
@@ -52,7 +54,8 @@ graph TB
         subgraph "Network Layer"
             NF[nftables<br/>Firewall]
             TC[tc HTB<br/>Bandwidth]
-            DNS[dnsmasq<br/>DHCP/DNS]
+            DNS[dnsmasq :53<br/>DHCP/DNS]
+            DNSA[dnsmasq-auth :5354<br/>Auth DNS]
         end
 
         subgraph "Application Layer"
@@ -82,10 +85,12 @@ graph TB
 
     G1 & G2 & G3 --> DNS
     DNS --> FP
+    DNSA --> FP
     FP --> SM
     SM --> NF & TC
     SM --> PG & RD
     SM --> OP & OF & CB & MW & SA
+    SM --> DNS & DNSA
     SCH --> SM
     NF --> WAN
     AD --> SM
@@ -124,7 +129,11 @@ flowchart TD
     Q -->|Checkout Sync| R
     Q -->|Manual Kick| R
     Q -->|Data Limit| R
+    Q -->|Self-Disconnect| R
     R --> S[❌ Session Expired]
+
+    P --> SD[Visit http://logout.wifi]
+    SD --> Q
 ```
 
 ---
@@ -151,6 +160,7 @@ stateDiagram-v2
     Active --> Expiring: Checkout detected
     Active --> Expiring: Manual kick
     Active --> Expiring: Data limit reached
+    Active --> Expiring: Self-disconnect (logout.wifi)
 
     Expiring --> Expired: Remove from whitelist
     Expiring --> Expired: Remove bandwidth limits
@@ -186,7 +196,8 @@ flowchart LR
         subgraph NetStack["Network Stack"]
             NFT[nftables<br/>Filtering]
             HTC[tc HTB<br/>QoS]
-            DNSM[dnsmasq<br/>DHCP + DNS]
+            DNSM[dnsmasq :53<br/>DHCP + DNS]
+            DNSA[dnsmasq-auth :5354<br/>Auth DNS]
         end
     end
 
@@ -203,6 +214,8 @@ flowchart LR
     WIFI <--> D1 & D2 & D3
     D1 & D2 & D3 --> DNSM
     DNSM --> Portal
+    DNSA --> Portal
+    NFT -->|dns_bypass set| DNSA
     Portal --> NFT
 ```
 
@@ -300,6 +313,7 @@ cp .env.example .env
 | `WAN_INTERFACE` | WAN interface name | `eth0` |
 | `PORTAL_IP` | Portal IP address | `10.0.0.1` |
 | `PORTAL_PORT` | Portal port | `8080` |
+| `DNS_UPSTREAM_IP` | Upstream DNS for authenticated clients | `8.8.8.8` |
 
 ### Network Modes
 
@@ -312,20 +326,40 @@ flowchart TB
     end
 
     subgraph RedirectFlow["Redirect Mode Flow"]
-        R1[Guest DNS Query] --> R2[dnsmasq intercepts]
+        R1[Guest DNS Query] --> R2[dnsmasq :53 intercepts]
         R2 --> R3[Returns Portal IP]
         R3 --> R4[Guest loads portal]
     end
 
     subgraph ForwardFlow["Forward Mode Flow"]
-        F1[Guest DNS Query] --> F2[dnsmasq forwards]
+        F1[Guest DNS Query] --> F2[dnsmasq :53 forwards]
         F2 --> F3[Upstream DNS resolves]
         F3 --> F4[Returns real IP]
     end
 
+    subgraph AuthFlow["Authenticated Client DNS"]
+        A1[Auth Client DNS] --> A2[nftables redirects to :5354]
+        A2 --> A3[dnsmasq-auth resolves]
+        A3 -->|logout.wifi / logout| A4[Returns Portal IP]
+        A3 -->|other domains| A5[Upstream DNS → real IP]
+    end
+
+    subgraph LogoutURL["Self-Service Logout URL"]
+        L1[Guest types http://logout.wifi]
+        L1 --> L2[DNS resolves to Portal IP]
+        L2 --> L3{Active session?}
+        L3 -->|Yes| L4[Shows disconnect.html]
+        L3 -->|No| L5[Shows login.html]
+        L4 --> L6[Click Disconnect]
+        L6 --> L5
+    end
+
     RED --> RedirectFlow
     FWD --> ForwardFlow
+    FWD & RED --> AuthFlow
 ```
+
+> **Note:** `logout.wifi` works on all platforms including macOS/iOS/Chrome (which require a dot in the hostname to treat it as a DNS name). DHCP search domain `wifi` is also set so clients can use bare `http://logout` after DHCP renewal. DoH (DNS-over-HTTPS) is blocked for authenticated clients to ensure `logout.wifi` always resolves correctly.
 
 ---
 
