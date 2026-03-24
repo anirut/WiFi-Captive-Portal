@@ -56,6 +56,20 @@ class SessionManager:
                     logger.info(f"MAC {mac} reconnected with same IP {ip} - reusing session")
                 return existing_session
 
+        # Check if this IP is already in use by a different device
+        ip_conflict_result = await db.execute(
+            select(Session).where(
+                Session.ip_address == ip,
+                Session.status == SessionStatus.active,
+                Session.expires_at > datetime.now(timezone.utc),
+            )
+        )
+        conflicting_session = ip_conflict_result.scalar_one_or_none()
+        if conflicting_session and conflicting_session.mac_address != mac:
+            logger.info(f"IP conflict: {ip} is used by MAC {conflicting_session.mac_address}, kicking old session")
+            # New device got the same IP - kick the old session
+            await self.expire_session(db, conflicting_session, SessionStatus.kicked)
+
         # No existing session for this MAC - create new session
         session = Session(
             ip_address=ip,
