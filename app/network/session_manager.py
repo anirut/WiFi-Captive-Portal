@@ -34,9 +34,9 @@ class SessionManager:
                     cast(Session.mac_address, String) == mac,
                     Session.status == SessionStatus.active,
                     Session.expires_at > datetime.now(timezone.utc),
-                )
+                ).order_by(Session.connected_at.desc()).limit(1)
             )
-            existing_session = result.scalar_one_or_none()
+            existing_session = result.scalars().first()
 
             if existing_session:
                 old_ip = str(existing_session.ip_address)
