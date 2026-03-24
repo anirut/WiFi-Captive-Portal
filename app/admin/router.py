@@ -22,6 +22,7 @@ from app.core.auth import get_current_user, get_current_admin, create_access_tok
 from app.core.config import settings
 from app.network.session_manager import SessionManager
 from app.pms.factory import load_adapter, ADAPTER_MAP
+from app.pms.opera_fias import OperaFIASAdapter
 from app.admin.schemas import PMSConfigResponse, PMSConfigUpdate, PMSTestResult, VoucherCreate, VoucherResponse, BatchVoucherCreate, DhcpConfigUpdate, DhcpConfigResponse
 from fastapi.responses import Response as _Response
 from app.voucher.pdf import generate_voucher_pdf as _gen_pdf
@@ -264,6 +265,9 @@ async def check_pms_health(
                 adapter = adapter_class(config)
                 start = time.monotonic()
                 try:
+                    # FIAS needs TCP connection established before health check
+                    if isinstance(adapter, OperaFIASAdapter):
+                        await adapter.connect()
                     ok = await adapter.health_check()
                     latency = (time.monotonic() - start) * 1000
                     test_result = PMSTestResult(ok=ok, latency_ms=round(latency, 1))
