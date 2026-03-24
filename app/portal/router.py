@@ -167,8 +167,8 @@ async def disconnect(request: Request, db: AsyncSession = Depends(get_db)):
             Session.status == SessionStatus.active
         )
     )
-    session = result.scalar_one_or_none()
-    if session:
+    sessions = result.scalars().all()
+    for session in sessions:
         await session_manager.expire_session(db, session, SessionStatus.kicked)
     return {"status": "disconnected"}
 
