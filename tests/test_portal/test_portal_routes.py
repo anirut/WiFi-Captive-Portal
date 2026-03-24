@@ -144,3 +144,14 @@ async def test_portal_shows_disconnect_when_session_active(client):
         assert response.status_code == 200
         # Check that we got the disconnect page, not login
         assert "Disconnect" in response.text
+
+
+@pytest.mark.asyncio
+async def test_portal_shows_login_when_no_session(client):
+    """When client has no active session, GET / should show login page."""
+    # get_mac_for_ip returns None by default in conftest
+    response = await client.get("/")
+    assert response.status_code == 200
+    # Should show login form, not disconnect
+    assert "Room Number" in response.text or "Voucher" in response.text
+    assert "Disconnect" not in response.text
