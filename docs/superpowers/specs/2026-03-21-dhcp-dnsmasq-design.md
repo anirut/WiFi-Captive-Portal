@@ -20,17 +20,26 @@ The portal currently assumes DHCP and DNS are managed externally. This spec inte
 
 ```
 [Guest Device]
-      │  DHCP request (UDP 67/68)
+      │  DHCP request (UDP 67/68)  ← also gets domain-search=wifi, domain-name=wifi
       ▼
-[dnsmasq on gateway] ──── assign IP from configured pool
+[dnsmasq port 53] ──── assign IP from configured pool
       │  DNS query (UDP/TCP 53)
       ▼
-[dnsmasq]
+[dnsmasq port 53]
       ├── dns_mode=redirect → answer all domains with portal IP (pre-auth captive detection)
-      │   authenticated guests: iptables DNAT redirects their port-53 to upstream DNS directly
+      │   + address=/logout.wifi/<portal_ip>  + address=/logout/<portal_ip>
+      │   authenticated guests (dns_bypass set): nftables DNAT → dnsmasq-auth:5354
       └── dns_mode=forward  → forward to upstream DNS (8.8.8.8, 8.8.4.4) for all guests
+          + address=/logout.wifi/<portal_ip>  + address=/logout/<portal_ip>
 
-[Admin UI] → PUT /admin/api/dhcp → write /etc/dnsmasq.d/captive-portal.conf → systemctl reload dnsmasq
+[dnsmasq-auth port 5354]  ← for authenticated (dns_bypass) clients only
+      ├── address=/logout.wifi/<portal_ip>
+      ├── address=/logout/<portal_ip>
+      └── server=8.8.8.8  (forward all other domains upstream — no catch-all)
+
+[Admin UI] → PUT /admin/api/dhcp → write /etc/dnsmasq.d/captive-portal.conf
+                                 + write /etc/dnsmasq-auth.conf
+                                 → systemctl restart dnsmasq + dnsmasq-auth
 ```
 
 The FastAPI app runs as root (per existing install.sh), so it can write to `/etc/dnsmasq.d/` and call `systemctl reload dnsmasq` directly.
@@ -81,14 +90,15 @@ Add `DhcpConfig` and `DnsModeType` to `app/core/models.py`.
 |------|-----------|----------------|
 | `alembic/versions/c3d4e5f6_dhcp_config.py` | New | Create `dhcp_config` table + seed default row |
 | `app/core/models.py` | Modify | Add `DnsModeType` enum + `DhcpConfig` ORM model |
-| `app/network/dnsmasq.py` | New | Config generation, file writing, reload, status, lease parsing |
-| `app/network/iptables.py` | Modify | Add `add_dns_bypass(ip)` + `remove_dns_bypass(ip)` |
+| `app/network/dnsmasq.py` | New | Config generation for both dnsmasq + dnsmasq-auth, file writing, reload, status, lease parsing |
+| `app/network/nftables.py` | Modify | Add `add_dns_bypass(ip)` + `remove_dns_bypass(ip)` (using nftables sets) |
 | `app/network/session_manager.py` | Modify | Call `add_dns_bypass(ip)` in `create_session()`, `remove_dns_bypass(ip)` in `expire_session()` |
 | `app/admin/router.py` | Modify | DHCP API + HTML page routes |
 | `app/admin/schemas.py` | Modify | `DhcpConfigUpdate` + `DhcpConfigResponse` Pydantic schemas |
 | `app/admin/templates/base.html` | Modify | Add DHCP nav link to sidebar |
 | `app/admin/templates/dhcp.html` | New | Admin DHCP configuration UI |
-| `scripts/setup-dnsmasq.sh` | New | Install dnsmasq, disable default config, initial setup |
+| `scripts/setup-dnsmasq.sh` | New | Install dnsmasq, disable default config, create `dnsmasq-auth.service` |
+| `scripts/setup-nftables.sh` | New | nftables table with whitelist, dns_bypass, doh_servers sets |
 | `tests/test_network/test_dnsmasq.py` | New | Unit tests for dnsmasq module |
 | `tests/test_admin/test_admin_dhcp.py` | New | API tests for DHCP endpoints |
 
@@ -96,9 +106,13 @@ Add `DhcpConfig` and `DnsModeType` to `app/core/models.py`.
 
 ## Module: `app/network/dnsmasq.py`
 
+Constants:
+- `CONF_FILE = "/etc/dnsmasq.d/captive-portal.conf"` — main dnsmasq config
+- `AUTH_CONF_FILE = "/etc/dnsmasq-auth.conf"` — auth dnsmasq config (port 5354)
+
 ### `write_config(config: DhcpConfig) -> None`
 
-Generates `/etc/dnsmasq.d/captive-portal.conf` from the DB config object.
+Generates both config files from the DB config object.
 
 **CIDR to netmask conversion:** Use Python stdlib:
 ```python
@@ -107,7 +121,7 @@ netmask = str(ipaddress.IPv4Network(config.subnet, strict=False).netmask)
 # e.g. "192.168.0.0/22" → "255.255.252.0"
 ```
 
-Template output (dns_mode=redirect, log_queries=True example):
+**Main config** (`/etc/dnsmasq.d/captive-portal.conf`) template (dns_mode=redirect, log_queries=True):
 ```
 # Managed by WiFi Captive Portal — do not edit manually
 interface=wlan0
@@ -119,10 +133,16 @@ no-resolv
 dhcp-range=192.168.0.10,192.168.3.250,255.255.252.0,8h
 dhcp-option=option:router,192.168.0.1
 dhcp-option=option:dns-server,192.168.0.1
+dhcp-option=option:domain-name,wifi
+dhcp-option=option:domain-search,wifi
 
 # DNS upstream
 server=8.8.8.8
 server=8.8.4.4
+
+# Logout shortcut hostnames
+address=/logout.wifi/192.168.0.1
+address=/logout/192.168.0.1
 
 # DNS mode: redirect (catch-all to portal IP)
 address=/#/192.168.0.1
@@ -132,16 +152,39 @@ log-dhcp
 log-queries
 ```
 
-Template output (dns_mode=forward): identical but WITHOUT the `address=/#/...` line.
+Template output (dns_mode=forward): identical but WITHOUT the `address=/#/...` line. The `logout.wifi`/`logout` entries are always present regardless of mode.
+
+**Auth config** (`/etc/dnsmasq-auth.conf`) — always written when `enabled=True`:
+```
+# Managed by WiFi Captive Portal — do not edit manually
+# Auth DNS: resolves logout shortcuts, forwards everything else upstream.
+port=5354
+listen-address=192.168.0.1
+bind-interfaces
+no-resolv
+
+# Upstream DNS for real domains
+server=8.8.8.8
+server=8.8.4.4
+
+# Logout shortcut hostnames
+address=/logout.wifi/192.168.0.1
+address=/logout/192.168.0.1
+```
 
 **When `enabled=False`:**
-- Do NOT write a config file
-- Run `systemctl stop dnsmasq` (subprocess, check=False, log errors)
+- Do NOT write config files
+- Run `systemctl stop dnsmasq` and `systemctl stop dnsmasq-auth`
 - `get_status()` will return `running: false`
 
 ### `reload_dnsmasq() -> bool`
 
-Runs `systemctl reload dnsmasq`. Returns True on success, False on failure. Logs errors.
+Runs `systemctl restart dnsmasq`. Returns True on success, False on failure. Logs errors.
+Only called when `enabled=True`.
+
+### `reload_auth_dnsmasq() -> bool`
+
+Runs `systemctl restart dnsmasq-auth`. Returns True on success, False on failure.
 Only called when `enabled=True`.
 
 ### `get_status() -> dict`
@@ -179,33 +222,31 @@ Returns `[]` if file does not exist or cannot be read.
 
 ---
 
-## Module: `app/network/iptables.py` additions
+## Module: `app/network/nftables.py` additions
 
 Required for `dns_mode=redirect` to work correctly after authentication.
 
 ### `add_dns_bypass(ip: str) -> None`
 
-Adds an iptables DNAT rule in the `nat` `PREROUTING` chain that redirects port-53 traffic from an authenticated guest IP directly to upstream DNS (`8.8.8.8`), bypassing dnsmasq's catch-all redirect:
+Adds IP to the `dns_bypass` nftables set. nftables then redirects that client's port-53 traffic to `dnsmasq-auth` on port 5354 (which resolves `logout`/`logout.wifi` and forwards everything else to 8.8.8.8 — no catch-all):
 
 ```bash
-iptables -t nat -I PREROUTING -s <ip> -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53
-iptables -t nat -I PREROUTING -s <ip> -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+nft add element inet captive_portal dns_bypass { <ip> }
 ```
 
-Uses existing `_run()` helper (same pattern as `add_whitelist`). Called from `SessionManager.create_session()`.
+Called from `SessionManager.create_session()`.
 
 ### `remove_dns_bypass(ip: str) -> None`
 
-Removes the DNAT rules added by `add_dns_bypass`:
+Removes IP from the `dns_bypass` nftables set:
 
 ```bash
-iptables -t nat -D PREROUTING -s <ip> -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53
-iptables -t nat -D PREROUTING -s <ip> -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+nft delete element inet captive_portal dns_bypass { <ip> }
 ```
 
-Uses `_run()` with `check=False` (same pattern as `remove_whitelist`). Called from `SessionManager.expire_session()`.
+Called from `SessionManager.expire_session()`.
 
-**Note:** `add_dns_bypass` / `remove_dns_bypass` are always called unconditionally in `SessionManager` (regardless of current `dns_mode`). When `dns_mode=forward`, these rules are harmless no-ops because dnsmasq does not have a catch-all redirect in that mode. This avoids coupling `SessionManager` to the DHCP config.
+**Note:** `add_dns_bypass` / `remove_dns_bypass` are always called unconditionally in `SessionManager` (regardless of current `dns_mode`). When `dns_mode=forward`, the entries are harmless because dnsmasq-auth forwards to upstream anyway. This avoids coupling `SessionManager` to the DHCP config.
 
 ---
 
@@ -298,7 +339,7 @@ Extends `base.html`. Glassmorphism style (matching existing templates). Three ca
 
 ## Script: `scripts/setup-dnsmasq.sh`
 
-One-time setup script (called during `install.sh` Section 8):
+One-time setup script (called during `install.sh` Section 8). Also creates the `dnsmasq-auth` systemd service:
 
 ```bash
 #!/usr/bin/env bash
@@ -309,16 +350,34 @@ systemctl stop dnsmasq || true
 echo "conf-dir=/etc/dnsmasq.d/,*.conf" > /etc/dnsmasq.conf
 mkdir -p /etc/dnsmasq.d
 systemctl enable dnsmasq
-# Don't start here — write_config() + reload_dnsmasq() called from app lifespan
+
+# Create auth DNS service (second dnsmasq instance for authenticated clients)
+cat > /etc/systemd/system/dnsmasq-auth.service <<'EOF'
+[Unit]
+Description=WiFi Captive Portal Auth DNS (port 5354)
+After=network.target dnsmasq.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=/etc/dnsmasq-auth.conf
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable dnsmasq-auth
+# Don't start here — write_config() called from app lifespan writes the config first
 ```
 
-`install.sh` is updated to call `bash "$SCRIPT_DIR/setup-dnsmasq.sh"` in Section 8 (Network Rules), after iptables/tc setup.
+`install.sh` is updated to call `bash "$SCRIPT_DIR/setup-dnsmasq.sh"` in Section 8 (Network Rules), after nftables/tc setup.
 
 ---
 
 ## app/main.py lifespan integration
 
-In the existing `lifespan` async context manager, add dnsmasq startup restoration after the IFB/tc setup:
+In the existing `lifespan` async context manager, add dnsmasq startup restoration after the IFB/tc setup. Both main and auth instances are restarted:
 
 ```python
 # In lifespan startup block:
@@ -332,9 +391,9 @@ try:
         _result = await _db.execute(select(DhcpConfig))
         _dhcp = _result.scalar_one_or_none()
         if _dhcp and _dhcp.enabled:
-            _dnsmasq.write_config(_dhcp)
-            _dnsmasq.reload_dnsmasq()
-            logger.info("dnsmasq config restored from DB")
+            _dnsmasq.write_config(_dhcp)     # writes both CONF_FILE and AUTH_CONF_FILE
+            _dnsmasq.reload_dnsmasq()        # restarts dnsmasq (port 53)
+            _dnsmasq.reload_auth_dnsmasq()   # restarts dnsmasq-auth (port 5354)
 except Exception as e:
     logger.warning(f"dnsmasq startup restore failed: {e}")
 ```
@@ -386,20 +445,33 @@ except Exception as e:
 
 | Mode | Behavior | Use case |
 |------|----------|----------|
-| `redirect` | dnsmasq answers ALL DNS with portal IP; authenticated guest DNS is DNAT'd to 8.8.8.8 via iptables | Best captive portal detection on iOS/Android |
-| `forward` | dnsmasq forwards DNS to upstream normally; iptables HTTP redirect handles portal detection | Simpler; works for most devices |
+| `redirect` | dnsmasq answers ALL DNS with portal IP; authenticated guest DNS goes to dnsmasq-auth (resolves logout + forwards real queries) | Best captive portal detection on iOS/Android |
+| `forward` | dnsmasq forwards DNS to upstream normally; nftables HTTP redirect handles portal detection | Simpler; works for most devices |
 
 **Recommended default:** `redirect`.
 
-**DNS bypass iptables rules** (added by `add_dns_bypass(ip)`, removed by `remove_dns_bypass(ip)`):
-```bash
-# Add (on auth):
-iptables -t nat -I PREROUTING -s <ip> -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53
-iptables -t nat -I PREROUTING -s <ip> -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+**DNS bypass flow** (managed via nftables `dns_bypass` set):
 
-# Remove (on expire):
-iptables -t nat -D PREROUTING -s <ip> -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53
-iptables -t nat -D PREROUTING -s <ip> -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53
+```
+Unauthenticated client DNS → nftables DNAT → dnsmasq port 53 (catch-all in redirect mode)
+Authenticated client DNS   → nftables DNAT → dnsmasq-auth port 5354 (logout only + upstream forward)
 ```
 
-These rules are in the `nat` table `PREROUTING` chain, which runs before the `filter` table — so they intercept DNS before dnsmasq's catch-all can respond.
+nftables `prerouting` chain rules (from `setup-nftables.sh`):
+```nft
+ip saddr @dns_bypass     udp dport 53 dnat to $PORTAL_IP:5354
+ip saddr @dns_bypass     tcp dport 53 dnat to $PORTAL_IP:5354
+ip saddr != @dns_bypass  udp dport 53 dnat to $PORTAL_IP:53
+ip saddr != @dns_bypass  tcp dport 53 dnat to $PORTAL_IP:53
+```
+
+**DoH blocking** (prevents macOS/Chrome bypassing dnsmasq-auth via DNS-over-HTTPS):
+```nft
+set doh_servers {
+    type ipv4_addr; flags interval
+    elements = { 8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1, 9.9.9.9, 149.112.112.112,
+                 208.67.222.222, 208.67.220.220 }
+}
+# forward chain:
+ip saddr @dns_bypass ip daddr @doh_servers tcp dport 443 reject with icmp admin-prohibited
+```

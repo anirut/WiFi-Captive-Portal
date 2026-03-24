@@ -191,24 +191,41 @@ WiFi Captive Portal คือระบบควบคุมการเข้า
 
 ### 2.5 DHCP + DNS (dnsmasq)
 
-ระบบมี dnsmasq ในตัวสำหรับให้บริการ DHCP และ DNS:
+ระบบมี dnsmasq ในตัวสำหรับให้บริการ DHCP และ DNS รันเป็น **2 instance**:
+
+| Instance | Port | สำหรับ | พฤติกรรม |
+|----------|------|--------|----------|
+| `dnsmasq` | 53 | unauthenticated clients | DHCP + DNS (catch-all หรือ forward ตาม mode) |
+| `dnsmasq-auth` | 5354 | authenticated clients | ตอบ `logout`/`logout.wifi` เท่านั้น + forward ที่เหลือไป 8.8.8.8 |
 
 #### DHCP Features
 - กำหนด IP range สำหรับแขกได้
 - ตั้งค่า lease time (30m, 1h, 4h, 8h, 12h, 24h)
 - Gateway และ DNS server แนบไปกับ DHCP response
+- **DHCP search domain `wifi`** — ส่ง `domain-name=wifi` และ `domain-search=wifi` ให้ทุก client เพื่อให้ macOS resolve `logout` → `logout.wifi` อัตโนมัติ
 - ดูรายการ lease ปัจจุบันได้ใน Admin UI
 
 #### DNS Modes
 | Mode | พฤติกรรม | ข้อดี |
 |------|----------|-------|
-| **redirect** | ตอบ DNS ทุก domain ด้วย portal IP; authenticated guests ได้รับ DNS bypass | Captive portal detection ทำงานได้ดีที่สุด |
+| **redirect** | ตอบ DNS ทุก domain ด้วย portal IP; authenticated guests ไปที่ dnsmasq-auth | Captive portal detection ทำงานได้ดีที่สุด |
 | **forward** | ส่ง DNS query ต่อไปยัง upstream DNS | ง่ายกว่า ใช้ได้กับอุปกรณ์ส่วนใหญ่ |
 
 #### DNS Bypass (redirect mode)
-- Authenticated guests ได้รับ nftables DNAT rule ส่ง DNS ไปยัง 8.8.8.8 โดยตรง
-- ข้าม dnsmasq catch-all redirect
-- ทำให้ใช้อินเทอร์เน็ตได้ปกติหลัง login
+- Authenticated guests ถูก nftables redirect DNS port 53 ไปที่ **dnsmasq-auth port 5354**
+- dnsmasq-auth ตอบ `logout`/`logout.wifi` → portal IP และ forward domain อื่นไป 8.8.8.8
+- ทำให้ใช้อินเทอร์เน็ตได้ปกติและ resolve logout URL ได้
+
+#### Logout URL Shortcut
+- แขกพิมพ์ `http://logout.wifi` หรือ `http://logout` ในเบราว์เซอร์เพื่อ disconnect
+- DNS resolve → portal IP → portal แสดงหน้า disconnect (ถ้ามี active session)
+- รองรับทุก OS: macOS, iOS, Android, Windows, Linux
+- `logout.wifi` (มีจุด) = primary URL — ทำงานได้บน macOS/Chrome/Safari ทุกกรณี
+- `logout` (ไม่มีจุด) = fallback — ต้อง reconnect WiFi ครั้งแรกเพื่อรับ search domain
+
+#### DoH Blocking
+- nftables block port 443 ไปหา DoH providers ที่รู้จัก (Google, Cloudflare, Quad9, OpenDNS) สำหรับ authenticated clients
+- บังคับให้ browser fallback มาใช้ plain DNS port 53 ซึ่ง intercept ไปที่ dnsmasq-auth
 
 ---
 

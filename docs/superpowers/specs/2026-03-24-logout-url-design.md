@@ -1,7 +1,7 @@
 # Logout URL Feature Design
 
 **Date:** 2026-03-24
-**Status:** Approved
+**Status:** Implemented
 
 ## Problem
 
@@ -9,21 +9,48 @@ Users who close the browser after logging into the WiFi portal have no easy way 
 
 ## Solution
 
-Allow users to type `http://logout` in their browser to access a dedicated disconnect page.
+Allow users to type `http://logout.wifi` (primary) or `http://logout` (fallback) in their browser to access a dedicated disconnect page.
+
+> **Note:** `logout.wifi` is the primary URL because macOS, iOS, and Chrome require at least one dot in a hostname to treat it as a DNS name rather than a search query. `logout` (no dot) works on Linux/Android but not reliably on Apple devices.
 
 ## Implementation
 
-### 1. DNS Configuration (Manual - User Side)
+### 1. DNS Configuration (Automatic — via dnsmasq)
 
-Configure DNS server (dnsmasq, Pi-hole, or router) to resolve `logout` to the portal IP:
+`app/network/dnsmasq.py` `write_config()` automatically adds to `/etc/dnsmasq.d/captive-portal.conf`:
 
 ```
-logout  →  192.168.x.x  (portal IP)
+address=/logout.wifi/<gateway_ip>
+address=/logout/<gateway_ip>
 ```
 
-Optionally also add:
+Both resolve to the portal/gateway IP regardless of `dns_mode` (redirect or forward).
+
+#### DHCP Search Domain
+
+`write_config()` also sets DHCP options so clients automatically try `logout.wifi` when resolving bare `logout`:
+
 ```
-wifi    →  192.168.x.x  (portal IP)
+dhcp-option=option:domain-name,wifi
+dhcp-option=option:domain-search,wifi
+```
+
+With this, typing `http://logout` on macOS/curl resolves via the search domain to `logout.wifi` → portal IP.
+
+#### Auth DNS (dnsmasq-auth service — port 5354)
+
+Authenticated (whitelisted) clients have their DNS redirected to a **second dnsmasq instance** on port 5354 (`/etc/dnsmasq-auth.conf`) instead of going directly to 8.8.8.8. This second instance:
+- Answers `logout` and `logout.wifi` → portal IP
+- Forwards all other domains to upstream (8.8.8.8, 8.8.4.4) — no catch-all
+
+This allows authenticated clients to still resolve the logout shortcut even though they bypass the main dnsmasq catch-all.
+
+#### DoH Blocking (for macOS/Chrome)
+
+nftables blocks port 443 to well-known DoH providers (Google 8.8.8.8, Cloudflare 1.1.1.1, Quad9 9.9.9.9, OpenDNS) for authenticated clients. This forces DoH to fail and fall back to plain DNS port 53, which is intercepted and forwarded to the auth dnsmasq on port 5354.
+
+```nft
+ip saddr @dns_bypass ip daddr @doh_servers tcp dport 443 reject with icmp admin-prohibited
 ```
 
 ### 2. Portal Route Logic Change
@@ -93,29 +120,61 @@ Create a new dedicated disconnect page with:
 └─────────────────────────────────┘
 ```
 
-### 4. User Flow
+### 4. nftables Rules for Portal IP Access
 
-1. User authenticates → redirected to `/success`
-2. User closes browser tab
-3. Later, user types `http://logout` in browser
-4. DNS resolves to portal IP
-5. Portal checks for active session by MAC address
-6. Active session found → shows `disconnect.html`
-7. User clicks Disconnect → POST to `/session/disconnect`
-8. Session expired → redirect to `/` → shows `login.html`
+Added to `scripts/setup-nftables.sh` so all clients (authenticated or not) can reach the portal on port 80/443:
+
+```nft
+# prerouting chain
+ip daddr $PORTAL_IP tcp dport 80  dnat to $PORTAL_IP:$PORTAL_PORT
+ip daddr $PORTAL_IP tcp dport 443 dnat to $PORTAL_IP:8443
+```
+
+Without these rules, authenticated (whitelisted) clients bypass the normal DNAT, so `http://logout.wifi` would connect to portal_ip:80 but nothing listens there.
+
+### 5. User Flow
+
+**Unauthenticated client:**
+1. Types `http://logout.wifi`
+2. DNS (dnsmasq, catch-all mode) → portal IP
+3. HTTP port 80 → DNAT → portal port 8080
+4. No active session found → shows `login.html`
+
+**Authenticated client:**
+1. Types `http://logout.wifi`
+2. DNS (dnsmasq-auth, port 5354) → portal IP
+3. HTTP port 80 → DNAT to portal port 8080 (new rule above)
+4. Active session found by MAC → shows `disconnect.html`
+5. Clicks Disconnect → `POST /session/disconnect`
+6. Session expired → redirected to `/` → shows `login.html`
+
+### Known Limitations
+
+| Device | `http://logout.wifi` | `http://logout` |
+|--------|---------------------|-----------------|
+| macOS / iOS / Chrome | ✅ | ✅ (after DHCP renew for search domain) |
+| Android / Linux | ✅ | ✅ |
+| iCloud Private Relay enabled | ⚠️ DNS bypassed entirely | ⚠️ |
+
+For iCloud Private Relay: user must disable it in System Settings → Apple ID → iCloud → Private Relay → Off for this network.
 
 ## Files Changed
 
 | File | Action |
 |------|--------|
-| `app/portal/router.py` | Modify - add session check to `/` route |
-| `app/portal/templates/disconnect.html` | Create - new dedicated disconnect page |
+| `app/portal/router.py` | Modify — add session check to `/` route |
+| `app/portal/templates/disconnect.html` | Create — new dedicated disconnect page |
+| `app/network/dnsmasq.py` | Modify — add `logout.wifi`/`logout` address entries, DHCP search domain, auth config writing |
+| `scripts/setup-nftables.sh` | Modify — add portal IP redirect rules, `doh_servers` set, DoH blocking |
+| `scripts/setup-dnsmasq.sh` | Modify — add `dnsmasq-auth.service` systemd unit |
 
 ## Testing
 
 1. Login to portal
 2. Close browser tab
-3. Open new tab, navigate to `http://<portal-ip>/`
-4. Verify disconnect.html is shown
+3. Open new tab, navigate to `http://logout.wifi`
+4. Verify `disconnect.html` is shown
 5. Click disconnect button
-6. Verify session is terminated and login page is shown
+6. Verify session is terminated and `login.html` is shown
+7. From macOS terminal: `nslookup logout.wifi` should return portal IP
+8. From macOS terminal: `curl http://logout.wifi` should return HTML

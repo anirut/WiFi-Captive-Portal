@@ -30,31 +30,34 @@ sudo bash scripts/setup-tc.sh
 
 ## Architecture
 
-This is a **FastAPI modular monolith** for a hotel captive portal. Guests authenticate via room+last-name (PMS lookup) or voucher code, then get iptables/tc rules applied to allow internet access with optional bandwidth shaping.
+This is a **FastAPI modular monolith** for a hotel captive portal. Guests authenticate via room+last-name (PMS lookup) or voucher code, then get nftables/tc rules applied to allow internet access with optional bandwidth shaping.
 
 ### Session lifecycle
 
 1. Guest POSTs to `/auth/room` or `/auth/voucher`
-2. `SessionManager.create_session()` writes a `Session` row, calls `iptables.add_whitelist(ip)` and `tc.apply_bandwidth_limit(ip, kbps)` via subprocess
-3. APScheduler runs `expire_overdue_sessions()` every 60 seconds — this calls `iptables.remove_whitelist` + `tc.remove_bandwidth_limit` and marks sessions `expired`
+2. `SessionManager.create_session()` writes a `Session` row, calls `nftables.add_whitelist(ip)`, `nftables.add_dns_bypass(ip)`, and `tc.apply_bandwidth_limit(ip, kbps)` via subprocess
+3. APScheduler runs `expire_overdue_sessions()` every 60 seconds — this calls `nftables.remove_whitelist` + `nftables.remove_dns_bypass` + `tc.remove_bandwidth_limit` and marks sessions `expired`
 4. Guest can also self-disconnect via `POST /session/disconnect`
+5. Guest can disconnect by navigating to `http://logout.wifi` — portal detects active session by MAC and shows `disconnect.html`
 
 ### Module map
 
 | Path | Responsibility |
 |------|---------------|
 | `app/core/` | Config (pydantic-settings from `.env`), SQLAlchemy async engine/session, ORM models, Fernet encryption, JWT auth, rate limiter |
-| `app/network/` | `iptables.py` (subprocess whitelist), `tc.py` (HTB bandwidth shaping), `arp.py` (MAC lookup from `/proc/net/arp`), `session_manager.py` (orchestrates DB + network), `scheduler.py` (APScheduler wrapper) |
+| `app/network/` | `nftables.py` (whitelist + dns_bypass sets), `tc.py` (HTB bandwidth shaping), `arp.py` (MAC lookup from `/proc/net/arp`), `dnsmasq.py` (write configs for both dnsmasq port 53 + dnsmasq-auth port 5354, reload), `https_redirect.py` (mini TLS server on port 8443), `session_manager.py` (orchestrates DB + network), `scheduler.py` (APScheduler wrapper) |
 | `app/pms/` | `base.py` (abstract `PMSAdapter` + `GuestInfo` dataclass), `standalone.py` (DB-backed adapter), `factory.py` (load active adapter from DB or fall back to standalone) |
 | `app/voucher/` | Code generation (ambiguous-char-free) and validation with `VoucherValidationError` |
-| `app/portal/` | Guest-facing FastAPI router (`/`, `/auth/*`, `/success`, `/expired`, `/session/disconnect`), Jinja2 templates, request schemas |
+| `app/portal/` | Guest-facing FastAPI router (`/`, `/auth/*`, `/success`, `/expired`, `/session/disconnect`), Jinja2 templates, request schemas. `GET /` shows `disconnect.html` if client has active session, otherwise `login.html` |
 | `app/admin/` | Admin router (`/admin/sessions` list + kick), JWT-protected |
 
 ### Network enforcement
 
-- **iptables**: `FORWARD` chain whitelist per guest IP. `_run()` wraps subprocess calls, returns `None`. `is_whitelisted` uses `check=False` directly (not via `_run`).
-- **tc HTB**: class ID computed as `int(parts[2]) * 256 + int(parts[3])` from the IP's last two octets. Upload shaping is deferred (not implemented).
-- **Patch targets** in tests must be module-local: `patch("app.network.iptables.subprocess.run")`, never `patch("subprocess.run")`.
+- **nftables** (`scripts/setup-nftables.sh`): manages three sets — `whitelist` (internet access), `dns_bypass` (DNS routing to dnsmasq-auth), `doh_servers` (known DoH provider IPs). `nftables.py` uses `nft` CLI to add/remove elements. Patch target: `patch("app.network.nftables.subprocess.run")`.
+- **tc HTB**: class ID computed as `int(parts[2]) * 256 + int(parts[3])` from the IP's last two octets. Upload shaping via IFB device.
+- **dnsmasq** (port 53): DHCP + DNS for guests. In `redirect` mode answers all DNS with portal IP.
+- **dnsmasq-auth** (port 5354): second instance for authenticated clients. Resolves `logout`/`logout.wifi` → portal IP, forwards all other queries to upstream. Configured by `dnsmasq.py` alongside the main instance.
+- **Patch targets** in tests must be module-local: `patch("app.network.nftables.subprocess.run")`, never `patch("subprocess.run")`.
 
 ### PMS adapter pattern
 
@@ -76,8 +79,9 @@ This is a **FastAPI modular monolith** for a hotel captive portal. Guests authen
 | `ENCRYPTION_KEY` | Fernet key for PMS credentials |
 | `DATABASE_URL` | `postgresql+asyncpg://...` |
 | `REDIS_URL` | `redis://...` |
-| `WIFI_INTERFACE` / `WAN_INTERFACE` | Used in iptables/tc scripts |
-| `PORTAL_IP` / `PORTAL_PORT` | Redirect target in iptables |
+| `WIFI_INTERFACE` / `WAN_INTERFACE` | Used in nftables/tc scripts |
+| `PORTAL_IP` / `PORTAL_PORT` | Portal IP and port (default 8080) |
+| `DNS_UPSTREAM_IP` | Upstream DNS for auth proxy (default `8.8.8.8`) |
 
 ### Testing
 
