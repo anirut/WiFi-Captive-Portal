@@ -92,8 +92,11 @@ table inet captive_portal {
         ip saddr != @dns_bypass udp dport 53 dnat to $PORTAL_IP:53
         ip saddr != @dns_bypass tcp dport 53 dnat to $PORTAL_IP:53
 
-        # Portal redirect for unauthenticated users (HTTP only)
+        # Portal redirect for unauthenticated users (HTTP)
         ip saddr != @whitelist tcp dport 80 dnat to $PORTAL_IP:$PORTAL_PORT
+
+        # HTTPS redirect → mini TLS server on port 8443 (returns 302 to HTTP portal)
+        ip saddr != @whitelist tcp dport 443 dnat to $PORTAL_IP:8443
     }
 
     chain postrouting {
@@ -103,9 +106,6 @@ table inet captive_portal {
 
     chain input {
         type filter hook input priority filter; policy accept;
-        # TCP RST for unauthenticated HTTPS — triggers browser captive portal detection
-        # Redirecting HTTPS to an HTTP port causes SSL error instead of captive portal
-        tcp dport 443 ct state new ip saddr != @whitelist reject with tcp reset
     }
 
     chain forward {

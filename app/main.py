@@ -11,6 +11,7 @@ from app.admin.router import router as admin_router
 from app.pms.webhook_router import router as webhook_router
 from app.network.scheduler import start_scheduler, stop_scheduler
 from app.network.tc import ensure_ifb_ready
+from app.network.https_redirect import start_https_redirect_server
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +21,13 @@ async def lifespan(app: FastAPI):
         ensure_ifb_ready()
     except Exception:
         pass
+    # HTTPS redirect server — intercepts port 443 for unauthenticated clients
+    _https_server = None
+    try:
+        _https_server = await start_https_redirect_server(settings.PORTAL_IP, settings.PORTAL_PORT)
+    except Exception as _e:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(f"HTTPS redirect server failed to start: {_e}")
     # Restore dnsmasq config from DB
     try:
         from app.core.database import AsyncSessionFactory
@@ -48,6 +56,9 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     stop_scheduler()
+    if _https_server:
+        _https_server.close()
+        await _https_server.wait_closed()
     await app.state.redis.aclose()
     await engine.dispose()
 
