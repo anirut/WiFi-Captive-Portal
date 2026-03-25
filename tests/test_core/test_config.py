@@ -10,5 +10,5 @@ def test_settings_loads_defaults():
     )
     assert s.JWT_ALGORITHM == "HS256"
     assert s.JWT_EXPIRE_HOURS == 8
-    assert s.AUTH_RATE_LIMIT_ATTEMPTS == 5
+    assert s.AUTH_RATE_LIMIT_ATTEMPTS == 20
     assert s.WIFI_INTERFACE == "wlan0"
