@@ -28,22 +28,30 @@ class PMSConfigUpdate(BaseModel):
     client_secret: str | None = None
     hotel_id: str | None = None
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     @classmethod
     def build_config_dict(cls, data):
         """Build config dict from individual fields if not provided."""
         if isinstance(data, dict):
             # If config not provided, build it from individual fields
-            if 'config' not in data or data['config'] is None:
+            if "config" not in data or data["config"] is None:
                 config = {}
-                for field in ['host', 'port', 'auth_key', 'vendor_id', 'base_url',
-                             'client_id', 'client_secret', 'hotel_id']:
+                for field in [
+                    "host",
+                    "port",
+                    "auth_key",
+                    "vendor_id",
+                    "base_url",
+                    "client_id",
+                    "client_secret",
+                    "hotel_id",
+                ]:
                     if field in data and data[field]:
                         config[field] = data[field]
                 if config:
-                    data['config'] = config
+                    data["config"] = config
                 else:
-                    data['config'] = {}  # Empty dict is required
+                    data["config"] = {}  # Empty dict is required
         return data
 
 
@@ -61,15 +69,20 @@ class VoucherCreate(BaseModel):
     max_uses: int = 1
     expires_at: datetime | None = None
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     @classmethod
     def coerce_string_ints(cls, data):
         """Convert string numbers and empty strings to int/None."""
         if isinstance(data, dict):
-            for field in ['duration_minutes', 'data_limit_mb', 'max_devices', 'max_uses']:
+            for field in [
+                "duration_minutes",
+                "data_limit_mb",
+                "max_devices",
+                "max_uses",
+            ]:
                 if field in data:
                     v = data[field]
-                    if v == '' or v is None:
+                    if v == "" or v is None:
                         data[field] = None
                     elif isinstance(v, str):
                         try:
@@ -88,15 +101,21 @@ class BatchVoucherCreate(BaseModel):
     expires_at: datetime | None = None
     count: int = Field(ge=1, le=100)
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     @classmethod
     def coerce_string_ints(cls, data):
         """Convert string numbers and empty strings to int/None."""
         if isinstance(data, dict):
-            for field in ['duration_minutes', 'data_limit_mb', 'max_uses', 'max_devices', 'count']:
+            for field in [
+                "duration_minutes",
+                "data_limit_mb",
+                "max_uses",
+                "max_devices",
+                "count",
+            ]:
                 if field in data:
                     v = data[field]
-                    if v == '' or v is None:
+                    if v == "" or v is None:
                         data[field] = None
                     elif isinstance(v, str):
                         try:
@@ -147,3 +166,39 @@ class DhcpConfigResponse(BaseModel):
     dns_mode: str
     log_queries: bool
     updated_at: str
+
+
+class MacBypassCreate(BaseModel):
+    mac_address: str = Field(..., pattern=r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
+    description: str | None = None
+    expires_at: datetime | None = None
+
+
+class MacBypassResponse(BaseModel):
+    id: uuid.UUID
+    mac_address: str
+    description: str | None
+    created_by: uuid.UUID
+    created_at: datetime
+    expires_at: datetime | None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class WalledGardenDomainCreate(BaseModel):
+    domain: str = Field(..., max_length=253)
+    description: str | None = None
+
+
+class WalledGardenDomainResponse(BaseModel):
+    id: uuid.UUID
+    domain: str
+    description: str | None
+    created_by: uuid.UUID
+    created_at: datetime
+    is_active: bool
+
+    class Config:
+        from_attributes = True

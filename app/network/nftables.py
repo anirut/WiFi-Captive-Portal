@@ -3,6 +3,7 @@ nftables.py - nftables set operations for captive portal.
 
 Replaces iptables.py with set-based O(1) lookups.
 """
+
 import subprocess
 import logging
 from typing import Optional
@@ -20,14 +21,11 @@ class NftablesManager:
         """Execute nft command."""
         cmd = ["nft"] + args
         logger.debug(f"nftables: executing: {' '.join(cmd)}")
-        result = subprocess.run(
-            cmd,
-            check=check,
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(cmd, check=check, capture_output=True, text=True)
         if result.returncode != 0:
-            logger.warning(f"nftables command returned {result.returncode}: {result.stderr}")
+            logger.warning(
+                f"nftables command returned {result.returncode}: {result.stderr}"
+            )
         return result.stdout if result.returncode == 0 else None
 
     # ── Whitelist Operations ─────────────────────────────────────────
@@ -43,7 +41,9 @@ class NftablesManager:
             logger.error(f"nftables add failed for {ip}: {e.stderr}")
             raise
         except Exception as e:
-            logger.error(f"nftables add failed with unexpected error for {ip}: {type(e).__name__}: {e}")
+            logger.error(
+                f"nftables add failed with unexpected error for {ip}: {type(e).__name__}: {e}"
+            )
             raise
 
     @classmethod
@@ -52,7 +52,7 @@ class NftablesManager:
         result = subprocess.run(
             ["nft", "delete", "element", cls.TABLE, "whitelist", f"{{ {ip} }}"],
             check=False,
-            capture_output=True
+            capture_output=True,
         )
         if result.returncode == 0:
             logger.info(f"nftables: removed {ip} from whitelist")
@@ -65,7 +65,7 @@ class NftablesManager:
         result = subprocess.run(
             ["nft", "get", "element", cls.TABLE, "whitelist", f"{{ {ip} }}"],
             check=False,
-            capture_output=True
+            capture_output=True,
         )
         return result.returncode == 0
 
@@ -87,12 +87,14 @@ class NftablesManager:
         result = subprocess.run(
             ["nft", "delete", "element", cls.TABLE, "dns_bypass", f"{{ {ip} }}"],
             check=False,
-            capture_output=True
+            capture_output=True,
         )
         if result.returncode == 0:
             logger.info(f"nftables: removed {ip} from DNS bypass")
         else:
-            logger.warning(f"nftables dns_bypass remove failed for {ip} (may not exist)")
+            logger.warning(
+                f"nftables dns_bypass remove failed for {ip} (may not exist)"
+            )
 
     # ── Session Helpers (Combined) ─────────────────────────────────
 
@@ -110,3 +112,64 @@ class NftablesManager:
         cls.remove_from_whitelist(ip)
         cls.remove_dns_bypass(ip)
         logger.info(f"nftables: removed session rules for {ip}")
+
+    # ── MAC Bypass Operations ───────────────────────────────────────
+
+    @classmethod
+    def add_mac_bypass(cls, mac: str) -> None:
+        """Add MAC to mac_bypass set (format: xx:xx:xx:xx:xx:xx)."""
+        try:
+            cls._run(["add", "element", cls.TABLE, "mac_bypass", f"{{ {mac} }}"])
+            logger.info(f"nftables: added {mac} to mac_bypass")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"nftables mac_bypass add failed for {mac}: {e.stderr}")
+            raise
+
+    @classmethod
+    def remove_mac_bypass(cls, mac: str) -> None:
+        """Remove MAC from mac_bypass set."""
+        result = subprocess.run(
+            ["nft", "delete", "element", cls.TABLE, "mac_bypass", f"{{ {mac} }}"],
+            check=False,
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            logger.info(f"nftables: removed {mac} from mac_bypass")
+
+    # ── Walled Garden Operations ────────────────────────────────────
+
+    @classmethod
+    def add_walled_garden(cls, ip: str) -> None:
+        """Add IP to walled_garden set (pre-auth access)."""
+        try:
+            cls._run(["add", "element", cls.TABLE, "walled_garden", f"{{ {ip} }}"])
+            logger.info(f"nftables: added {ip} to walled_garden")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"nftables walled_garden add failed for {ip}: {e.stderr}")
+            raise
+
+    @classmethod
+    def remove_walled_garden(cls, ip: str) -> None:
+        """Remove IP from walled_garden set."""
+        result = subprocess.run(
+            ["nft", "delete", "element", cls.TABLE, "walled_garden", f"{{ {ip} }}"],
+            check=False,
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            logger.info(f"nftables: removed {ip} from walled_garden")
+
+    @classmethod
+    def sync_walled_garden(cls, domains: list[str]) -> None:
+        """Sync walled garden: resolve domains to IPs and add to set."""
+        import socket
+
+        for domain in domains:
+            try:
+                ips = socket.getaddrinfo(domain, 80, socket.AF_INET)
+                for ip_info in ips:
+                    ip_address = str(ip_info[4][0])
+                    cls.add_walled_garden(ip_address)
+                    logger.debug(f"nftables: resolved {domain} to {ip_address}")
+            except socket.gaierror:
+                logger.warning(f"Could not resolve domain: {domain}")

@@ -26,3 +26,7 @@ build/
 
 # Git worktrees
 .worktrees/
+
+.claude
+.opencode
+

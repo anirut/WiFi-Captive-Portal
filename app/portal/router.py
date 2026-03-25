@@ -13,7 +13,7 @@ from app.network.session_manager import SessionManager
 from app.voucher.generator import validate_voucher, VoucherValidationError
 from app.portal.schemas import RoomAuthRequest, VoucherAuthRequest, SessionResponse
 from sqlalchemy import func
-from app.core.models import Guest, Room, Policy, Session, SessionStatus
+from app.core.models import Guest, Room, Policy, Session, SessionStatus, MacBypass
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,30 +21,57 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/portal/templates")
 session_manager = SessionManager()
 
+
 async def _get_redis(request: Request):
     return request.app.state.redis
+
 
 @router.get("/", response_class=HTMLResponse)
 async def portal_login(request: Request, db: AsyncSession = Depends(get_db)):
     from app.network.arp import get_mac_for_ip
+    from sqlalchemy import or_
 
-    # Check if client already has an active session
     mac = get_mac_for_ip(request.client.host)
     if mac:
+        mac_upper = mac.upper()
+
         result = await db.execute(
             sa_select(Session).where(
-                cast(Session.mac_address, String) == mac,
-                Session.status == SessionStatus.active
+                cast(Session.mac_address, String) == mac_upper,
+                Session.status == SessionStatus.active,
             )
         )
         active_session = result.scalar_one_or_none()
         if active_session:
             return templates.TemplateResponse(
-                request, "disconnect.html",
-                {"expires_at": active_session.expires_at}
+                request, "disconnect.html", {"expires_at": active_session.expires_at}
+            )
+
+        bypass_result = await db.execute(
+            sa_select(MacBypass).where(
+                MacBypass.mac_address == mac_upper,
+                MacBypass.is_active == True,
+                or_(
+                    MacBypass.expires_at.is_(None),
+                    MacBypass.expires_at > datetime.now(timezone.utc),
+                ),
+            )
+        )
+        bypass = bypass_result.scalar_one_or_none()
+        if bypass:
+            session = await session_manager.create_session(
+                db=db,
+                ip=request.client.host,
+                guest_id=None,
+                voucher_id=None,
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+            )
+            return templates.TemplateResponse(
+                request, "success.html", {"auto_bypass": True}
             )
 
     return templates.TemplateResponse(request, "login.html")
+
 
 @router.post("/auth/room")
 async def auth_room(
@@ -55,7 +82,8 @@ async def auth_room(
     redis = await _get_redis(request)
     try:
         await check_rate_limit(
-            request.client.host, redis,
+            request.client.host,
+            redis,
             max_attempts=settings.AUTH_RATE_LIMIT_ATTEMPTS,
             window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
         )
@@ -68,15 +96,22 @@ async def auth_room(
         raise HTTPException(status_code=401, detail={"error": "guest_not_checked_in"})
 
     # Look up room policy for session duration + bandwidth limits
-    room_result = await db.execute(sa_select(Room).where(Room.number == body.room_number))
+    room_result = await db.execute(
+        sa_select(Room).where(Room.number == body.room_number)
+    )
     room = room_result.scalar_one_or_none()
     policy = None
     if room and room.policy_id:
-        policy_result = await db.execute(sa_select(Policy).where(Policy.id == room.policy_id))
+        policy_result = await db.execute(
+            sa_select(Policy).where(Policy.id == room.policy_id)
+        )
         policy = policy_result.scalar_one_or_none()
 
     if policy and policy.session_duration_min > 0:
-        expires_at = min(guest_info.check_out, datetime.now(timezone.utc) + timedelta(minutes=policy.session_duration_min))
+        expires_at = min(
+            guest_info.check_out,
+            datetime.now(timezone.utc) + timedelta(minutes=policy.session_duration_min),
+        )
     else:
         expires_at = guest_info.check_out
 
@@ -85,9 +120,13 @@ async def auth_room(
 
     # Upsert local Guest record so sessions can be linked and expired by room
     if guest_info.pms_id:
-        guest_result = await db.execute(sa_select(Guest).where(Guest.pms_guest_id == guest_info.pms_id))
+        guest_result = await db.execute(
+            sa_select(Guest).where(Guest.pms_guest_id == guest_info.pms_id)
+        )
     else:
-        guest_result = await db.execute(sa_select(Guest).where(Guest.room_number == guest_info.room_number))
+        guest_result = await db.execute(
+            sa_select(Guest).where(Guest.room_number == guest_info.room_number)
+        )
     guest = guest_result.scalar_one_or_none()
     if guest is None:
         guest = Guest(
@@ -109,7 +148,9 @@ async def auth_room(
 
     # Enforce max concurrent devices per guest
     count_result = await db.execute(
-        sa_select(func.count()).select_from(Session).where(
+        sa_select(func.count())
+        .select_from(Session)
+        .where(
             Session.guest_id == guest.id,
             Session.status == SessionStatus.active,
         )
@@ -119,13 +160,15 @@ async def auth_room(
         raise HTTPException(status_code=429, detail={"error": "max_devices_reached"})
 
     session = await session_manager.create_session(
-        db=db, ip=request.client.host,
+        db=db,
+        ip=request.client.host,
         guest_id=guest.id,
         expires_at=expires_at,
         bandwidth_up_kbps=up_kbps,
         bandwidth_down_kbps=down_kbps,
     )
     return SessionResponse(session_id=str(session.id), expires_at=session.expires_at)
+
 
 @router.post("/auth/voucher")
 async def auth_voucher(
@@ -136,7 +179,8 @@ async def auth_voucher(
     redis = await _get_redis(request)
     try:
         await check_rate_limit(
-            request.client.host, redis,
+            request.client.host,
+            redis,
             max_attempts=settings.AUTH_RATE_LIMIT_ATTEMPTS,
             window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
         )
@@ -149,12 +193,15 @@ async def auth_voucher(
         raise HTTPException(status_code=401, detail={"error": e.reason})
 
     if voucher.duration_minutes:
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=voucher.duration_minutes)
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            minutes=voucher.duration_minutes
+        )
     else:
         expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
     session = await session_manager.create_session(
-        db=db, ip=request.client.host,
+        db=db,
+        ip=request.client.host,
         voucher_id=voucher.id,
         expires_at=expires_at,
     )
@@ -162,13 +209,16 @@ async def auth_voucher(
     await db.commit()
     return SessionResponse(session_id=str(session.id), expires_at=session.expires_at)
 
+
 @router.get("/success", response_class=HTMLResponse)
 async def portal_success(request: Request):
     return templates.TemplateResponse(request, "success.html")
 
+
 @router.get("/expired", response_class=HTMLResponse)
 async def portal_expired(request: Request):
     return templates.TemplateResponse(request, "expired.html")
+
 
 @router.post("/session/disconnect")
 async def disconnect(request: Request, db: AsyncSession = Depends(get_db)):
@@ -182,7 +232,7 @@ async def disconnect(request: Request, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         sa_select(Session).where(
             cast(Session.mac_address, String) == mac,
-            Session.status == SessionStatus.active
+            Session.status == SessionStatus.active,
         )
     )
     sessions = result.scalars().all()
@@ -195,6 +245,7 @@ async def disconnect(request: Request, db: AsyncSession = Depends(get_db)):
 # All OS/browser probes must receive a redirect (not 404) to trigger the
 # captive portal login dialog automatically.
 
+
 def _portal_redirect(request: Request) -> RedirectResponse:
     """Redirect to the portal login page using the portal's actual IP:port.
 
@@ -205,17 +256,31 @@ def _portal_redirect(request: Request) -> RedirectResponse:
     return RedirectResponse(url=portal_url, status_code=302)
 
 
-@router.get("/generate_204")           # Android / Chrome
-@router.get("/gen_204")               # Android / Chrome (alternative)
-@router.get("/hotspot-detect.html")    # Apple iOS / macOS
+@router.get("/generate_204")  # Android / Chrome
+@router.get("/gen_204")  # Android / Chrome (alternative)
+@router.get("/hotspot-detect.html")  # Apple iOS / macOS
 @router.get("/library/test/success.html")  # Apple (legacy)
-@router.get("/connecttest.txt")        # Windows NCSI
-@router.get("/ncsi.txt")              # Windows (legacy)
-@router.get("/redirect")              # Windows NCSI redirect
-@router.get("/canonical.html")        # Firefox 89+
-@router.get("/success.txt")           # Firefox (legacy)
+@router.get("/connecttest.txt")  # Windows NCSI
+@router.get("/ncsi.txt")  # Windows (legacy)
+@router.get("/redirect")  # Windows NCSI redirect
+@router.get("/canonical.html")  # Firefox 89+
+@router.get("/success.txt")  # Firefox (legacy)
 async def captive_portal_probe(request: Request):
     return _portal_redirect(request)
+
+
+@router.get("/captive-portal/api/v1/portal-info")
+async def captive_portal_info(request: Request):
+    """
+    RFC 8908 Captive Portal API endpoint.
+    Returns JSON with portal URL for client detection.
+    """
+    portal_url = f"http://{settings.PORTAL_IP}:{settings.PORTAL_PORT}/"
+    return {
+        "captive": True,
+        "user-portal-url": portal_url,
+        "version": "1.0",
+    }
 
 
 @router.get("/{full_path:path}", response_class=HTMLResponse)

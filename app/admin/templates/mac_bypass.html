@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title %}MAC Bypass{% endblock %}
+{% block head %}
+<style>
+  .bypass-hero {
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.08) 0%, rgba(59, 130, 246, 0.05) 100%);
+    border: 1px solid rgba(20, 184, 166, 0.2);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .bypass-hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(20, 184, 166, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  
+  .mac-icon-container {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%);
+    border: 1px solid rgba(20, 184, 166, 0.3);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .mac-input {
+    font-family: 'Courier New', monospace !important;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  
+  .bypass-row {
+    position: relative;
+  }
+  
+  .bypass-row::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 0;
+    background: linear-gradient(180deg, #14b8a6, #3b82f6);
+    border-radius: 0 3px 3px 0;
+    transition: height 0.3s ease;
+  }
+  
+  .bypass-row:hover::after {
+    height: 60%;
+  }
+  
+  .expired-badge {
+    background: rgba(100, 116, 139, 0.2);
+    color: #94a3b8;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+  }
+  
+  .active-badge {
+    background: rgba(20, 184, 166, 0.15);
+    color: #14b8a6;
+    border: 1px solid rgba(20, 184, 166, 0.3);
+  }
+  
+  .delete-btn {
+    opacity: 0.6;
+    transition: all 0.2s ease;
+  }
+  
+  .delete-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  
+  .empty-state {
+    background: linear-gradient(180deg, rgba(20, 184, 166, 0.03) 0%, transparent 100%);
+  }
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="page-title">MAC Address Bypass</div>
+
+<!-- Hero Card -->
+<div class="card bypass-hero mb-6">
+  <div style="display: flex; gap: 24px; align-items: flex-start;">
+    <div class="mac-icon-container">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#14b8a6" stroke-width="1.5" style="width: 32px; height: 32px;">
+        <rect x="2" y="5" width="20" height="14" rx="2"/>
+        <path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 14h.01M10 14h.01M14 14h.01M18 14h.01"/>
+        <path d="M2 10l2-2m4 0l4-4m4 0l4-4"/>
+      </svg>
+    </div>
+    <div style="flex: 1;">
+      <h3 style="font-size: 18px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px;">Device Allowlist</h3>
+      <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; max-width: 600px;">
+        Bypass authentication for specific devices. These MAC addresses will automatically receive network access without entering credentials. 
+        Useful for IoT devices, printers, staff devices, or persistent guest devices.
+      </p>
+      <div style="display: flex; gap: 16px; margin-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #14b8a6;"></span>
+          Active bypasses
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #64748b;"></span>
+          Expired bypasses
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Bypass Form -->
+<div class="card mb-6" x-data="{open: false, macFormat: ''}">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h3 style="font-size: 16px; font-weight: 700; color: #f1f5f9;">Add Device to Bypass</h3>
+    <button @click="open=!open" class="btn btn-secondary" style="border-color: rgba(20, 184, 166, 0.4); color: #14b8a6;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+        <path x-show="!open" d="M12 5v14M5 12h14"/>
+        <path x-show="open" d="M5 12h14"/>
+      </svg>
+      <span x-text="open ? 'Cancel' : 'New Bypass'"></span>
+    </button>
+  </div>
+  
+  <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform -translate-y-2" x-transition:enter-end="opacity-100 transform translate-y-0">
+    <form hx-post="/admin/api/mac-bypass" hx-target="#bypass-result" hx-ext="json-enc" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 16px; align-items: end;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label>MAC Address</label>
+        <input 
+          name="mac_address" 
+          type="text" 
+          placeholder="AA:BB:CC:DD:EE:FF"
+          pattern="^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+          maxlength="17"
+          x-model="macFormat"
+          @input="macFormat = macFormat.toUpperCase().replace(/[^A-F0-9:]/g, '').replace(/(.{2})(?=.)/g, '$1:');"
+          class="mac-input"
+          required
+          style="border-color: rgba(20, 184, 166, 0.4) !important;"
+        />
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label>Description <span style="color: #64748b; font-weight: 400;">(optional)</span></label>
+        <input name="description" type="text" placeholder="Reception printer, Staff laptop..." />
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label>Expires <span style="color: #64748b; font-weight: 400;">(optional)</span></label>
+        <input name="expires_at" type="datetime-local" />
+      </div>
+      <div style="grid-column: 1 / -1; display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+        <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Add to Bypass List
+        </button>
+      </div>
+    </form>
+  </div>
+  <div id="bypass-result" style="margin-top: 16px;"></div>
+</div>
+
+<!-- Bypass List -->
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <h3 style="font-size: 16px; font-weight: 700; color: #f1f5f9;">Bypass List</h3>
+    <span style="font-size: 12px; color: #64748b;" x-data="{count: 0}" x-init="fetch('/admin/api/mac-bypass').then(r=>r.json()).then(d=>count=d.length)">
+      <span x-text="count"></span> device(s)
+    </span>
+  </div>
+  
+  <div id="bypass-list">
+    {% if mac_bypass_list %}
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>MAC Address</th>
+            <th>Description</th>
+            <th>Added</th>
+            <th>Expires</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for bypass in mac_bypass_list %}
+          <tr class="bypass-row" style="padding-left: 16px;">
+            <td>
+              <code style="font-family: 'Courier New', monospace; color: #14b8a6; font-size: 13px; letter-spacing: 1px;">{{ bypass.mac_address }}</code>
+            </td>
+            <td>
+              <span style="color: #cbd5e1;">{{ bypass.description or '—' }}</span>
+            </td>
+            <td>
+              <span style="color: #94a3b8; font-size: 13px;">{{ bypass.created_at.strftime('%Y-%m-%d') }}</span>
+            </td>
+            <td>
+              <span style="color: #94a3b8; font-size: 13px;">{{ bypass.expires_at.strftime('%Y-%m-%d %H:%M') if bypass.expires_at else 'Never' }}</span>
+            </td>
+            <td>
+              {% if bypass.expires_at and bypass.expires_at < now %}
+              <span class="badge expired-badge">Expired</span>
+              {% elif bypass.is_active %}
+              <span class="badge active-badge">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block;"></span>
+                Active
+              </span>
+              {% else %}
+              <span class="badge expired-badge">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              <button 
+                hx-delete="/admin/api/mac-bypass/{{ bypass.id }}"
+                hx-confirm="Remove this device from bypass list?"
+                hx-target="closest tr"
+                hx-swap="outerHTML"
+                class="btn btn-danger delete-btn"
+                style="padding: 6px 10px;"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="text-align: center; padding: 60px 20px; border-radius: 12px;">
+      <div style="width: 80px; height: 80px; margin: 0 auto 20px; background: rgba(20, 184, 166, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#14b8a6" stroke-width="1.5" style="width: 40px; height: 40px; opacity: 0.5;">
+          <rect x="2" y="5" width="20" height="14" rx="2"/>
+          <path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01"/>
+        </svg>
+      </div>
+      <p style="font-size: 16px; font-weight: 600; color: #94a3b8; margin-bottom: 8px;">No bypassed devices</p>
+      <p style="font-size: 13px; color: #64748b;">Add a MAC address above to allow device access without authentication</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Quick Reference -->
+<div class="card" style="margin-top: 24px; background: rgba(20, 184, 166, 0.03); border-color: rgba(20, 184, 166, 0.15);">
+  <div style="display: flex; gap: 16px; align-items: flex-start;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#14b8a6" stroke-width="1.5" style="width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px;">
+      <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+    </svg>
+    <div>
+      <p style="font-size: 13px; font-weight: 600; color: #94a3b8; margin-bottom: 6px;">Quick Reference</p>
+      <p style="font-size: 12px; color: #64748b; line-height: 1.7;">
+        Devices on the bypass list automatically receive internet access when connected to the captive portal network. 
+        MAC addresses are matched exactly — ensure correct format (AA:BB:CC:DD:EE:FF). 
+        Expired entries remain in the list for audit purposes but no longer grant access.
+      </p>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

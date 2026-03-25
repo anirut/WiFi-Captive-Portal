@@ -462,6 +462,23 @@
         <span>Admin Users</span>
       </a>
 
+      <a href="/admin/mac-bypass" class="nav-item {% if '/mac-bypass' in request.url.path %}active{% endif %}">
+        <svg class="lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+          <rect x="2" y="5" width="20" height="14" rx="2"/>
+          <path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 14h.01M10 14h.01M14 14h.01M18 14h.01"/>
+        </svg>
+        <span>MAC Bypass</span>
+      </a>
+
+      <a href="/admin/walled-garden" class="nav-item {% if '/walled-garden' in request.url.path %}active{% endif %}">
+        <svg class="lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+          <path d="M3 21h18M4 21V10l8-6 8 6v11"/>
+          <path d="M9 21v-8h6v8"/>
+          <path d="M12 3v3"/>
+        </svg>
+        <span>Walled Garden</span>
+      </a>
+
       <a href="/admin/dhcp" class="nav-item {% if '/dhcp' in request.url.path %}active{% endif %}">
         <svg class="lucide lucide-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="2" y="2" width="20" height="8" rx="1" ry="1"/><rect x="2" y="14" width="20" height="8" rx="1" ry="1"/><line x1="6" y1="6" x2="6" y2="6.01"/><line x1="6" y1="18" x2="6" y2="18.01"/>

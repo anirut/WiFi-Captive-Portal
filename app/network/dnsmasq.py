@@ -14,12 +14,16 @@ LEASES_FILE = "/var/lib/misc/dnsmasq.leases"
 def write_config(config) -> None:
     """Write dnsmasq config from a DhcpConfig ORM object. If disabled, stop dnsmasq instead."""
     if not config.enabled:
-        subprocess.run(["systemctl", "stop", "dnsmasq"], check=False, capture_output=True)
+        subprocess.run(
+            ["systemctl", "stop", "dnsmasq"], check=False, capture_output=True
+        )
         logger.info("dnsmasq stopped (enabled=False)")
         return
 
     netmask = str(ipaddress.IPv4Network(config.subnet, strict=False).netmask)
-    dns_mode = config.dns_mode.value if hasattr(config.dns_mode, "value") else config.dns_mode
+    dns_mode = (
+        config.dns_mode.value if hasattr(config.dns_mode, "value") else config.dns_mode
+    )
 
     lines = [
         "# Managed by WiFi Captive Portal — do not edit manually",
@@ -36,6 +40,9 @@ def write_config(config) -> None:
         # macOS/curl will try logout.wifi → resolves to portal IP.
         "dhcp-option=option:domain-name,wifi",
         "dhcp-option=option:domain-search,wifi",
+        "",
+        "# RFC 8910: Captive Portal API — DHCP Option 114 (captive-portal-url)",
+        f"dhcp-option=option:captive-portal-url,http://{config.gateway_ip}/",
         "",
         "# DNS upstream",
         f"server={config.dns_upstream_1}",
@@ -99,7 +106,9 @@ def write_config(config) -> None:
 def reload_dnsmasq() -> bool:
     """Restart dnsmasq to apply new config. Returns True on success."""
     try:
-        subprocess.run(["systemctl", "restart", "dnsmasq"], check=True, capture_output=True)
+        subprocess.run(
+            ["systemctl", "restart", "dnsmasq"], check=True, capture_output=True
+        )
         logger.info("dnsmasq restarted")
         return True
     except subprocess.CalledProcessError as e:
@@ -110,7 +119,9 @@ def reload_dnsmasq() -> bool:
 def reload_auth_dnsmasq() -> bool:
     """Restart dnsmasq-auth (port 5354) to apply new config. Returns True on success."""
     try:
-        subprocess.run(["systemctl", "restart", "dnsmasq-auth"], check=True, capture_output=True)
+        subprocess.run(
+            ["systemctl", "restart", "dnsmasq-auth"], check=True, capture_output=True
+        )
         logger.info("dnsmasq-auth restarted")
         return True
     except subprocess.CalledProcessError as e:
@@ -122,8 +133,7 @@ def get_status() -> dict:
     """Return dnsmasq service status dict."""
     try:
         result = subprocess.run(
-            ["systemctl", "is-active", "dnsmasq"],
-            check=False, capture_output=True
+            ["systemctl", "is-active", "dnsmasq"], check=False, capture_output=True
         )
         running = result.returncode == 0
     except Exception:
@@ -161,5 +171,7 @@ def get_leases() -> list[dict]:
             expires_at = datetime.fromtimestamp(int(epoch), tz=timezone.utc).isoformat()
         except (ValueError, OSError):
             expires_at = None
-        leases.append({"mac": mac, "ip": ip, "hostname": hostname, "expires_at": expires_at})
+        leases.append(
+            {"mac": mac, "ip": ip, "hostname": hostname, "expires_at": expires_at}
+        )
     return leases
