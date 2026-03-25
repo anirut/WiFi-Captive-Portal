@@ -1,7 +1,7 @@
 # WiFi Captive Portal — รายละเอียดโปรแกรมและฟีเจอร์
 
-> เวอร์ชัน: Phase 3 (Admin Dashboard + DHCP/DNS)
-> อัปเดต: 2026-03-21
+> เวอร์ชัน: Phase 4 (MAC Bypass + Walled Garden + RFC 8910)
+> อัปเดต: 2026-03-25
 
 ---
 
@@ -298,6 +298,93 @@ Admin Dashboard แบบเต็มรูปแบบพร้อม UI สว
 
 ---
 
+### 2.9 MAC Address Bypass
+
+อุปกรณ์ที่อยู่ใน MAC Bypass List จะ**ข้ามการยืนยันตัวตน**และเข้าถึงอินเทอร์เน็ตได้ทันที
+
+#### การทำงาน
+1. Admin เพิ่ม MAC address ของอุปกรรมใน Admin Dashboard
+2. เมื่อแขกเชื่อมต่อ WiFi ระบบจะตรวจสอบ MAC address กับ mac_bypass table
+3. ถ้า MAC อยู่ใน list → เพิ่มลง nftables `mac_bypass` set โดยตรง (ไม่ต้อง login)
+4. ถ้าไม่อยู่ → ต้อง login ตามปกติ
+
+#### nftables Integration
+```
+set mac_bypass {
+    type ether_addr
+    flags constant
+}
+```
+- ใช้ `flags constant` เพื่อป้องกันการแก้ไข set จาก userspace
+- MAC addresses ถูกเพิ่ม/ลบ ผ่าน admin API
+
+#### Use Cases
+- อุปกรณ์ IoT (Smart TV, Chromecast, Alexa)
+- อุปกรณ์ของ staff/management
+- กรณีพิเศษที่ไม่ต้องการ auth
+
+---
+
+### 2.10 Walled Garden Domains
+
+อุปกรณ์ที่ยังไม่ได้ authenticate สามารถเข้าถึง**domain ที่อยู่ใน list**ได้
+
+#### การทำงาน
+1. Admin เพิ่ม domain names ใน Admin Dashboard (เช่น `spotify.com`, `apple.com`)
+2. ระบบ resolve domain → IP และเพิ่มลง nftables `walled_garden` set
+3. unauthenticated clients สามารถเข้าถึง domain เหล่านี้ได้โดยไม่ต้อง login
+
+#### nftables Integration
+```
+set walled_garden {
+    type ipv4_addr
+    flags interval
+}
+```
+- ใช้ `flags interval` สำหรับ IP ranges
+- Domain resolution ทำเมื่อ sync (ไม่ real-time)
+
+#### Use Cases
+- แอป streaming ที่ต้อง activate ก่อน (Spotify, Netflix)
+- หน้า check-in ของโรงแรม
+- Partner websites
+
+---
+
+### 2.11 RFC 8910/8908 Captive Portal API
+
+รองรับมาตรฐานใหม่สำหรับ Captive Portal Detection ที่รองรับโดยระบบปฏิบัติการสมัยใหม่
+
+#### API Endpoint
+`GET /captive-portal/api/v1/portal-info`
+
+#### Response
+```json
+{
+    "captive": true,
+    "user-portal-url": "http://192.168.44.1:8080/",
+    "version": "1.0"
+}
+```
+
+#### การตรวจจับของ OS
+| OS | Method | URL |
+|----|--------|-----|
+| Android | PROBE (HTTP) | `http://connectivitycheck.gstatic.com/generate_204` |
+| iOS/macOS | PROBE (HTTPS) | `http://captiveportal.apple.com/hotspot-detect.html` |
+| Windows | RFC 8910 DHCP | Option 114 (Captive Portal) |
+| Linux | PROBE (HTTP) | Various |
+
+#### DHCP Option 114 (RFC 8910)
+```
+option portal-url code 114 = string;
+option portal-url "http://192.168.44.1:8080/";
+```
+- dnsmasq ส่ง option 114 ใน DHCP response
+- Windows 10/11 อ่าน option นี้โดยตรง
+
+---
+
 ## 3. โครงสร้าง Database
 
 ### ตาราง guests
@@ -408,6 +495,27 @@ Admin Dashboard แบบเต็มรูปแบบพร้อม UI สว
 | `total_bytes_down` | BigInteger | รวม download |
 | `voucher_uses` | Integer | Voucher ใช้ในชั่วโมงนั้น |
 
+### ตาราง mac_bypass
+| คอลัมน์ | ชนิด | รายละเอียด |
+|---------|------|-----------|
+| `id` | UUID | Primary key |
+| `mac_address` | String(17) | MAC address (unique) |
+| `description` | String(200) | คำอธิบายอุปกรณ์ |
+| `created_by` | UUID FK | Admin ที่สร้าง |
+| `created_at` | DateTime(tz) | เวลาที่สร้าง |
+| `expires_at` | DateTime(tz) | หมดอายุ (optional) |
+| `is_active` | Boolean | เปิด/ปิดใช้งาน |
+
+### ตาราง walled_garden_domains
+| คอลัมน์ | ชนิด | รายละเอียด |
+|---------|------|-----------|
+| `id` | UUID | Primary key |
+| `domain` | String(253) | Domain name (unique) |
+| `description` | String(200) | คำอธิบาย |
+| `created_by` | UUID FK | Admin ที่สร้าง |
+| `created_at` | DateTime(tz) | เวลาที่สร้าง |
+| `is_active` | Boolean | เปิด/ปิดใช้งาน |
+
 ---
 
 ## 4. API Endpoints ทั้งหมด
@@ -422,6 +530,12 @@ Admin Dashboard แบบเต็มรูปแบบพร้อม UI สว
 | `GET` | `/success` | — | หน้า success หลัง login |
 | `GET` | `/expired` | — | หน้า session expired |
 | `POST` | `/session/disconnect` | — | ตัดการเชื่อมต่อด้วยตนเอง |
+
+### Captive Portal API (RFC 8910/8908)
+
+| Method | Path | Auth | รายละเอียด |
+|--------|------|------|-----------|
+| `GET` | `/captive-portal/api/v1/portal-info` | — | Portal info สำหรับ OS detection |
 
 ### Admin API
 
@@ -449,6 +563,12 @@ Admin Dashboard แบบเต็มรูปแบบพร้อม UI สว
 | `GET` | `/admin/api/dhcp/status` | superadmin | dnsmasq status |
 | `GET` | `/admin/api/dhcp/leases` | superadmin | DHCP leases |
 | `POST` | `/admin/api/dhcp/reload` | superadmin | Reload dnsmasq |
+| `GET` | `/admin/api/mac-bypass` | superadmin | รายการ MAC bypass |
+| `POST` | `/admin/api/mac-bypass` | superadmin | เพิ่ม MAC address |
+| `DELETE` | `/admin/api/mac-bypass/{id}` | superadmin | ลบ MAC address |
+| `GET` | `/admin/api/walled-garden` | superadmin | รายการ walled garden domains |
+| `POST` | `/admin/api/walled-garden` | superadmin | เพิ่ม domain |
+| `DELETE` | `/admin/api/walled-garden/{id}` | superadmin | ลบ domain |
 | `POST` | `/admin/vouchers/batch` | staff+ | สร้าง vouchers หลายตัว |
 | `GET` | `/admin/vouchers/{id}/pdf` | staff+ | Download voucher PDF |
 | `POST` | `/admin/logout` | staff+ | Logout (token blocklist) |
@@ -468,6 +588,8 @@ Admin Dashboard แบบเต็มรูปแบบพร้อม UI สว
 | `/admin/brand` | superadmin | Brand & config |
 | `/admin/users` | superadmin | Admin users |
 | `/admin/dhcp` | superadmin | DHCP settings |
+| `/admin/mac-bypass` | superadmin | MAC address bypass list |
+| `/admin/walled-garden` | superadmin | Walled garden domain list |
 
 ### Internal
 

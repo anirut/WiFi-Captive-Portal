@@ -48,12 +48,12 @@ This is a **FastAPI modular monolith** for a hotel captive portal. Guests authen
 | `app/network/` | `nftables.py` (whitelist + dns_bypass sets), `tc.py` (HTB bandwidth shaping), `arp.py` (MAC lookup from `/proc/net/arp`), `dnsmasq.py` (write configs for both dnsmasq port 53 + dnsmasq-auth port 5354, reload), `https_redirect.py` (mini TLS server on port 8443), `session_manager.py` (orchestrates DB + network), `scheduler.py` (APScheduler wrapper) |
 | `app/pms/` | `base.py` (abstract `PMSAdapter` + `GuestInfo` dataclass), `standalone.py` (DB-backed adapter), `factory.py` (load active adapter from DB or fall back to standalone) |
 | `app/voucher/` | Code generation (ambiguous-char-free) and validation with `VoucherValidationError` |
-| `app/portal/` | Guest-facing FastAPI router (`/`, `/auth/*`, `/success`, `/expired`, `/session/disconnect`), Jinja2 templates, request schemas. `GET /` shows `disconnect.html` if client has active session, otherwise `login.html` |
-| `app/admin/` | Admin router (`/admin/sessions` list + kick), JWT-protected |
+| `app/portal/` | Guest-facing FastAPI router (`/`, `/auth/*`, `/success`, `/expired`, `/session/disconnect`), Jinja2 templates, request schemas. `GET /` shows `disconnect.html` if client has active session, otherwise `login.html`. Includes RFC 8910 captive portal API at `/captive-portal/api/v1/portal-info` |
+| `app/admin/` | Admin router (`/admin/sessions` list + kick), JWT-protected. Includes MAC Bypass and Walled Garden CRUD pages at `/admin/mac-bypass` and `/admin/walled-garden` |
 
 ### Network enforcement
 
-- **nftables** (`scripts/setup-nftables.sh`): manages three sets — `whitelist` (internet access), `dns_bypass` (DNS routing to dnsmasq-auth), `doh_servers` (known DoH provider IPs). `nftables.py` uses `nft` CLI to add/remove elements. Patch target: `patch("app.network.nftables.subprocess.run")`.
+- **nftables** (`scripts/setup-nftables.sh`): manages five sets — `whitelist` (internet access), `dns_bypass` (DNS routing to dnsmasq-auth), `doh_servers` (known DoH provider IPs), `mac_bypass` (MAC addresses that skip auth), `walled_garden` (IPs for pre-auth domain access). `nftables.py` uses `nft` CLI to add/remove elements. Patch target: `patch("app.network.nftables.subprocess.run")`.
 - **tc HTB**: class ID computed as `int(parts[2]) * 256 + int(parts[3])` from the IP's last two octets. Upload shaping via IFB device.
 - **dnsmasq** (port 53): DHCP + DNS for guests. In `redirect` mode answers all DNS with portal IP.
 - **dnsmasq-auth** (port 5354): second instance for authenticated clients. Resolves `logout`/`logout.wifi` → portal IP, forwards all other queries to upstream. Configured by `dnsmasq.py` alongside the main instance.
