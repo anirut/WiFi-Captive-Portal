@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request, Depends, HTTPException
@@ -7,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select as sa_select, cast, String
 from app.core.database import get_db
 from app.core.config import settings
-from app.core.rate_limit import check_rate_limit, RateLimitExceeded
+from app.core.rate_limit import check_rate_limit, RateLimitExceeded, get_client_ip
 from app.pms.factory import get_adapter
 from app.network.session_manager import SessionManager
 from app.voucher.generator import validate_voucher, VoucherValidationError
@@ -21,6 +22,17 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/portal/templates")
 session_manager = SessionManager()
 
+MAC_PATTERN = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
+
+
+def _validate_mac(mac: str | None) -> str | None:
+    if mac is None:
+        return None
+    if MAC_PATTERN.match(mac):
+        return mac.upper()
+    logger.warning(f"Invalid MAC address format: {mac}")
+    return None
+
 
 async def _get_redis(request: Request):
     return request.app.state.redis
@@ -31,9 +43,9 @@ async def portal_login(request: Request, db: AsyncSession = Depends(get_db)):
     from app.network.arp import get_mac_for_ip
     from sqlalchemy import or_
 
-    mac = get_mac_for_ip(request.client.host)
+    mac = _validate_mac(get_mac_for_ip(request.client.host))
     if mac:
-        mac_upper = mac.upper()
+        mac_upper = mac
 
         result = await db.execute(
             sa_select(Session).where(
@@ -80,9 +92,11 @@ async def auth_room(
     db: AsyncSession = Depends(get_db),
 ):
     redis = await _get_redis(request)
+    xff = request.headers.get("X-Forwarded-For")
+    client_ip = get_client_ip(request.client.host, xff)
     try:
         await check_rate_limit(
-            request.client.host,
+            client_ip,
             redis,
             max_attempts=settings.AUTH_RATE_LIMIT_ATTEMPTS,
             window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
@@ -177,9 +191,11 @@ async def auth_voucher(
     db: AsyncSession = Depends(get_db),
 ):
     redis = await _get_redis(request)
+    xff = request.headers.get("X-Forwarded-For")
+    client_ip = get_client_ip(request.client.host, xff)
     try:
         await check_rate_limit(
-            request.client.host,
+            client_ip,
             redis,
             max_attempts=settings.AUTH_RATE_LIMIT_ATTEMPTS,
             window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
@@ -224,11 +240,10 @@ async def portal_expired(request: Request):
 async def disconnect(request: Request, db: AsyncSession = Depends(get_db)):
     from app.network.arp import get_mac_for_ip
 
-    # Get MAC address of the current device
-    mac = get_mac_for_ip(request.client.host)
+    mac = _validate_mac(get_mac_for_ip(request.client.host))
+    if not mac:
+        return {"status": "disconnected", "note": "no_valid_mac"}
 
-    # Find and expire session by MAC address, not IP
-    # This ensures device disconnects regardless of IP changes
     result = await db.execute(
         sa_select(Session).where(
             cast(Session.mac_address, String) == mac,

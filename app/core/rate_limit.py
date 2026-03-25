@@ -1,7 +1,16 @@
 class RateLimitExceeded(Exception):
     pass
 
-async def check_rate_limit(ip: str, redis_client, max_attempts: int, window_seconds: int) -> None:
+
+def get_client_ip(host: str | None, x_forwarded_for: str | None) -> str:
+    if x_forwarded_for and host:
+        return x_forwarded_for.split(",")[0].strip()
+    return host or "unknown"
+
+
+async def check_rate_limit(
+    ip: str, redis_client, max_attempts: int, window_seconds: int
+) -> None:
     key = f"rate_limit:auth:{ip}"
     count = await redis_client.incr(key)
     if count == 1:

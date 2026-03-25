@@ -1,7 +1,8 @@
 from typing import Literal
 import uuid
+import ipaddress
 from datetime import datetime
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from app.core.models import PMSAdapterType, VoucherType
 
 
@@ -151,6 +152,46 @@ class DhcpConfigUpdate(BaseModel):
     dns_mode: str | None = None
     log_queries: bool | None = None
 
+    @field_validator("gateway_ip")
+    @classmethod
+    def validate_gateway_ip(cls, v):
+        if v is not None:
+            try:
+                ipaddress.ip_address(v)
+            except ValueError:
+                raise ValueError("Invalid gateway IP address")
+        return v
+
+    @field_validator("subnet")
+    @classmethod
+    def validate_subnet(cls, v):
+        if v is not None:
+            try:
+                ipaddress.IPv4Network(v, strict=False)
+            except ValueError:
+                raise ValueError("Invalid subnet (must be a valid IPv4 network)")
+        return v
+
+    @field_validator("dhcp_range_start", "dhcp_range_end")
+    @classmethod
+    def validate_dhcp_range(cls, v):
+        if v is not None:
+            try:
+                ipaddress.ip_address(v)
+            except ValueError:
+                raise ValueError("Invalid DHCP range IP address")
+        return v
+
+    @field_validator("dns_upstream_1", "dns_upstream_2")
+    @classmethod
+    def validate_dns_upstream(cls, v):
+        if v is not None:
+            try:
+                ipaddress.ip_address(v)
+            except ValueError:
+                raise ValueError("Invalid DNS upstream IP address")
+        return v
+
 
 class DhcpConfigResponse(BaseModel):
     id: str
@@ -188,7 +229,11 @@ class MacBypassResponse(BaseModel):
 
 
 class WalledGardenDomainCreate(BaseModel):
-    domain: str = Field(..., max_length=253)
+    domain: str = Field(
+        ...,
+        max_length=253,
+        pattern=r"^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$",
+    )
     description: str | None = None
 
 

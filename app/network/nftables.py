@@ -4,11 +4,29 @@ nftables.py - nftables set operations for captive portal.
 Replaces iptables.py with set-based O(1) lookups.
 """
 
+import ipaddress
 import subprocess
 import logging
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+PRIVATE_NETWORKS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("0.0.0.0/8"),
+]
+
+
+def _validate_ip(ip: str) -> str:
+    try:
+        ipaddress.ip_address(ip)
+        return ip
+    except ValueError:
+        raise ValueError(f"Invalid IP address: {ip}")
 
 
 class NftablesManager:
@@ -34,6 +52,7 @@ class NftablesManager:
     def add_to_whitelist(cls, ip: str) -> None:
         """Add IP to whitelist set."""
         try:
+            ip = _validate_ip(ip)
             logger.debug(f"nftables: attempting to add {ip} to whitelist")
             cls._run(["add", "element", cls.TABLE, "whitelist", f"{{ {ip} }}"])
             logger.info(f"nftables: added {ip} to whitelist")
@@ -49,6 +68,7 @@ class NftablesManager:
     @classmethod
     def remove_from_whitelist(cls, ip: str) -> None:
         """Remove IP from whitelist set (ignores errors if not present)."""
+        ip = _validate_ip(ip)
         result = subprocess.run(
             ["nft", "delete", "element", cls.TABLE, "whitelist", f"{{ {ip} }}"],
             check=False,
@@ -62,6 +82,7 @@ class NftablesManager:
     @classmethod
     def is_whitelisted(cls, ip: str) -> bool:
         """Check if IP is in whitelist set."""
+        ip = _validate_ip(ip)
         result = subprocess.run(
             ["nft", "get", "element", cls.TABLE, "whitelist", f"{{ {ip} }}"],
             check=False,
@@ -75,6 +96,7 @@ class NftablesManager:
     def add_dns_bypass(cls, ip: str) -> None:
         """Add IP to dns_bypass set."""
         try:
+            ip = _validate_ip(ip)
             cls._run(["add", "element", cls.TABLE, "dns_bypass", f"{{ {ip} }}"])
             logger.info(f"nftables: added {ip} to DNS bypass")
         except subprocess.CalledProcessError as e:
@@ -84,6 +106,7 @@ class NftablesManager:
     @classmethod
     def remove_dns_bypass(cls, ip: str) -> None:
         """Remove IP from dns_bypass set (ignores errors if not present)."""
+        ip = _validate_ip(ip)
         result = subprocess.run(
             ["nft", "delete", "element", cls.TABLE, "dns_bypass", f"{{ {ip} }}"],
             check=False,
@@ -142,6 +165,7 @@ class NftablesManager:
     def add_walled_garden(cls, ip: str) -> None:
         """Add IP to walled_garden set (pre-auth access)."""
         try:
+            ip = _validate_ip(ip)
             cls._run(["add", "element", cls.TABLE, "walled_garden", f"{{ {ip} }}"])
             logger.info(f"nftables: added {ip} to walled_garden")
         except subprocess.CalledProcessError as e:
@@ -151,6 +175,7 @@ class NftablesManager:
     @classmethod
     def remove_walled_garden(cls, ip: str) -> None:
         """Remove IP from walled_garden set."""
+        ip = _validate_ip(ip)
         result = subprocess.run(
             ["nft", "delete", "element", cls.TABLE, "walled_garden", f"{{ {ip} }}"],
             check=False,
@@ -169,6 +194,19 @@ class NftablesManager:
                 ips = socket.getaddrinfo(domain, 80, socket.AF_INET)
                 for ip_info in ips:
                     ip_address = str(ip_info[4][0])
+                    try:
+                        addr = ipaddress.ip_address(ip_address)
+                        is_private = any(addr in net for net in PRIVATE_NETWORKS)
+                        if is_private:
+                            logger.warning(
+                                f"nftables: rejecting private IP {ip_address} from domain {domain}"
+                            )
+                            continue
+                    except ValueError:
+                        logger.warning(
+                            f"nftables: invalid IP {ip_address} from domain {domain}"
+                        )
+                        continue
                     cls.add_walled_garden(ip_address)
                     logger.debug(f"nftables: resolved {domain} to {ip_address}")
             except socket.gaierror:

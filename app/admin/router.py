@@ -605,7 +605,8 @@ async def create_policy(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(require_superadmin),
 ):
-    p = Policy(**body.dict())
+    validated = PolicyCreate.model_validate(body.model_dump())
+    p = Policy(**validated.model_dump())
     db.add(p)
     await db.commit()
     await db.refresh(p)
@@ -623,7 +624,8 @@ async def update_policy(
     p = result.scalar_one_or_none()
     if not p:
         raise HTTPException(404, {"error": "not_found"})
-    for k, v in body.dict().items():
+    validated = PolicyCreate.model_validate(body.model_dump())
+    for k, v in validated.model_dump().items():
         setattr(p, k, v)
     await db.commit()
     return {"id": str(p.id), "name": p.name}
@@ -1021,7 +1023,7 @@ LOGO_UPLOAD_DIR = "static/uploads/logo"
 
 class BrandUpdate(BaseModel):
     hotel_name: str | None = None
-    primary_color: str | None = None
+    primary_color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
     tc_text_th: str | None = None
     tc_text_en: str | None = None
     language: str | None = None
