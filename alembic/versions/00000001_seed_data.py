@@ -1,20 +1,26 @@
-"""mac_bypass
+"""seed_data
 
-Revision ID: d5e6f7a8
-Revises: c3d4e5f6
-Create Date: 2026-03-25 00:00:00.000000
+Revision ID: 00000001
+Revises: 00000000
+Create Date: 2026-03-20 00:00:00.000000
+
+Inserts required default rows for brand_config and dhcp_config, and
+optional test MAC bypass entries for development/staging environments.
 """
-
 from typing import Sequence, Union
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 import uuid
 
-revision: str = "d5e6f7a8"
-down_revision: Union[str, None] = "c3d4e5f6"
+from alembic import op
+import sqlalchemy as sa
+
+
+revision: str = '00000001'
+down_revision: Union[str, None] = '00000000'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
+
+BRAND_CONFIG_ID = '00000000-0000-0000-0000-000000000001'
+DHCP_CONFIG_ID = '00000000-0000-0000-0000-000000000002'
 
 TEST_MAC_ADDRESSES = [
     ("AA:BB:CC:DD:EE:01", "Test device 1 - iPhone"),
@@ -31,28 +37,21 @@ TEST_MAC_ADDRESSES = [
 
 
 def upgrade() -> None:
-    op.create_table(
-        "mac_bypass",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("mac_address", sa.String(17), nullable=False, unique=True),
-        sa.Column("description", sa.String(200), nullable=True),
-        sa.Column(
-            "created_by",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("admin_users.id"),
-            nullable=True,
-        ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
-        ),
-        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),
+    op.execute(
+        f"INSERT INTO brand_config (id, hotel_name, primary_color, language, updated_at) "
+        f"VALUES ('{BRAND_CONFIG_ID}', 'Hotel WiFi', '#3B82F6', 'th', now()) "
+        f"ON CONFLICT DO NOTHING"
     )
 
-    # Use the first superadmin's ID; fall back to NULL if none exists yet
+    op.execute(
+        f"INSERT INTO dhcp_config (id, enabled, interface, gateway_ip, subnet, "
+        f"dhcp_range_start, dhcp_range_end, lease_time, dns_upstream_1, dns_upstream_2, "
+        f"dns_mode, log_queries, updated_at) "
+        f"VALUES ('{DHCP_CONFIG_ID}', true, 'wlan0', '192.168.0.1', '192.168.0.0/22', "
+        f"'192.168.0.10', '192.168.3.250', '8h', '8.8.8.8', '8.8.4.4', 'redirect', false, now()) "
+        f"ON CONFLICT DO NOTHING"
+    )
+
     conn = op.get_bind()
     row = conn.execute(
         sa.text("SELECT id FROM admin_users WHERE role = 'superadmin' LIMIT 1")
@@ -69,4 +68,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("mac_bypass")
+    op.execute(f"DELETE FROM mac_bypass WHERE mac_address LIKE 'AA:BB:CC:DD:EE:%'")
+    op.execute(f"DELETE FROM dhcp_config WHERE id = '{DHCP_CONFIG_ID}'")
+    op.execute(f"DELETE FROM brand_config WHERE id = '{BRAND_CONFIG_ID}'")
