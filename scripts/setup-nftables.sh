@@ -122,8 +122,11 @@ table inet captive_portal {
         # Portal redirect for unauthenticated users (HTTP)
         ip saddr != @whitelist tcp dport 80 dnat to $PORTAL_IP:$PORTAL_PORT
 
-        # HTTPS redirect → mini TLS server on port 8443 (returns 302 to HTTP portal)
-        ip saddr != @whitelist tcp dport 443 dnat to $PORTAL_IP:8443
+        # NOTE: HTTPS (port 443) for unauthenticated clients is NOT DNAT'd here.
+        # Instead, the forward chain sends a TCP RST, which causes browsers to
+        # trigger their built-in captive portal detection immediately.
+        # (Intercepting TLS with a self-signed cert breaks browser security and
+        #  HSTS-preloaded sites like google.com cannot be intercepted at all.)
     }
 
     chain postrouting {
@@ -145,6 +148,10 @@ table inet captive_portal {
         ip saddr @whitelist accept
         # MAC bypass: allow full internet access for bypassed devices
         ct mark 0x2 accept
+        # Fast-fail HTTPS for unauthenticated clients: TCP RST causes browsers to
+        # immediately re-run captive portal detection (generate_204 / hotspot-detect)
+        # and show the "Sign in to network" prompt — much faster than a timeout.
+        tcp dport 443 reject with tcp reset
         reject with icmp type host-unreachable
     }
 }
