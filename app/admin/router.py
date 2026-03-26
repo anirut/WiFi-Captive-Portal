@@ -32,7 +32,6 @@ from app.core.models import (
     DhcpConfig,
     DnsModeType,
     MacBypass,
-    WalledGardenDomain,
 )
 from app.core.encryption import encrypt_config, decrypt_config
 from app.core.auth import (
@@ -57,8 +56,6 @@ from app.admin.schemas import (
     DhcpConfigResponse,
     MacBypassCreate,
     MacBypassResponse,
-    WalledGardenDomainCreate,
-    WalledGardenDomainResponse,
 )
 from fastapi.responses import Response as _Response
 from app.voucher.pdf import generate_voucher_pdf as _gen_pdf
@@ -112,7 +109,7 @@ async def login_submit(request: Request, db: AsyncSession = Depends(get_db)):
         )
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
-    token = create_access_token({"sub": user.username, "role": user.role.value})
+    token = create_access_token({"sub": str(user.id), "username": user.username, "role": user.role.value})
     next_url = request.query_params.get("next", "/admin/")
     # Fix 1: Reject absolute URLs to prevent open redirect
     parsed = urlparse(next_url)
@@ -410,7 +407,7 @@ async def create_batch_vouchers(
 ):
     """Create `count` vouchers with the same settings."""
     result = await db.execute(
-        select(AdminUser).where(AdminUser.username == payload["sub"])
+        select(AdminUser).where(AdminUser.id == uuid.UUID(payload["sub"]))
     )
     user = result.scalar_one_or_none()
     if not user:
@@ -441,7 +438,7 @@ async def create_voucher(
 ):
     # Resolve admin user id from JWT sub (username)
     result = await db.execute(
-        select(AdminUser).where(AdminUser.username == current_user["sub"])
+        select(AdminUser).where(AdminUser.id == uuid.UUID(current_user["sub"]))
     )
     admin = result.scalar_one_or_none()
     if not admin:
@@ -703,63 +700,6 @@ async def delete_mac_bypass(
         logger.warning(f"Failed to remove MAC from nftables: {e}")
 
     await db.delete(mac)
-    await db.commit()
-    return {"status": "deleted"}
-
-
-# ── Walled Garden CRUD ─────────────────────────────────────────────────────────
-
-
-@router.get("/api/walled-garden", response_model=list[WalledGardenDomainResponse])
-async def list_walled_garden(
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(require_superadmin),
-):
-    result = await db.execute(
-        select(WalledGardenDomain).order_by(WalledGardenDomain.created_at.desc())
-    )
-    return result.scalars().all()
-
-
-@router.post("/api/walled-garden", status_code=201)
-async def create_walled_garden_domain(
-    body: WalledGardenDomainCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(require_superadmin),
-):
-    domain = WalledGardenDomain(
-        domain=body.domain.lower(),
-        description=body.description,
-        created_by=uuid.UUID(current_user["sub"]),
-    )
-    db.add(domain)
-    await db.commit()
-    await db.refresh(domain)
-
-    from app.network.nftables import NftablesManager
-
-    try:
-        NftablesManager.sync_walled_garden([domain.domain])
-    except Exception as e:
-        logger.warning(f"Failed to sync walled garden: {e}")
-
-    return domain
-
-
-@router.delete("/api/walled-garden/{domain_id}")
-async def delete_walled_garden_domain(
-    domain_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(require_superadmin),
-):
-    result = await db.execute(
-        select(WalledGardenDomain).where(WalledGardenDomain.id == domain_id)
-    )
-    wg = result.scalar_one_or_none()
-    if not wg:
-        raise HTTPException(404, {"error": "not_found"})
-
-    await db.delete(wg)
     await db.commit()
     return {"status": "deleted"}
 
@@ -1209,7 +1149,7 @@ async def update_dhcp_config(
         _dnsmasq.write_config(d)
         reloaded = _dnsmasq.reload_dnsmasq()
     else:
-        _dnsmasq.write_config(d)  # stops dnsmasq when enabled=False
+        _dnsmasq.write_config(d)
     return {**_dhcp_to_response(d), "reloaded": reloaded}
 
 
@@ -1321,26 +1261,3 @@ async def mac_bypass_page(
     )
 
 
-# ── Walled Garden ───────────────────────────────────────────────────────────────
-
-
-@router.get("/walled-garden", response_class=HTMLResponse, include_in_schema=False)
-async def walled_garden_page(
-    request: Request,
-    payload: dict = Depends(require_superadmin),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(
-        select(WalledGardenDomain).order_by(WalledGardenDomain.created_at.desc())
-    )
-    walled_garden_list = result.scalars().all()
-    flash = request.session.pop("flash", None)
-    return _templates.TemplateResponse(
-        "walled_garden.html",
-        {
-            "request": request,
-            "current_user": payload,
-            "walled_garden_list": walled_garden_list,
-            "flash": flash,
-        },
-    )

@@ -13,7 +13,7 @@ from sqlalchemy import (
     DateTime,
     LargeBinary,
 )
-from sqlalchemy.dialects.postgresql import UUID, INET, MACADDR
+from sqlalchemy.dialects.postgresql import UUID, INET
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -84,7 +84,7 @@ class Session(Base):
         UUID(as_uuid=True), ForeignKey("vouchers.id"), nullable=True
     )
     ip_address: Mapped[str] = mapped_column(INET)
-    mac_address: Mapped[str | None] = mapped_column(MACADDR, nullable=True)
+    mac_address: Mapped[str | None] = mapped_column(String(17), nullable=True)
     connected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -268,7 +268,7 @@ class DhcpConfig(Base):
 class MacBypass(Base):
     __tablename__ = "mac_bypass"
     id: Mapped[uuid.UUID] = uuid_pk()
-    mac_address: Mapped[str] = mapped_column(MACADDR, unique=True, nullable=False)
+    mac_address: Mapped[str] = mapped_column(String(17), unique=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("admin_users.id")
@@ -282,15 +282,3 @@ class MacBypass(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class WalledGardenDomain(Base):
-    __tablename__ = "walled_garden_domains"
-    id: Mapped[uuid.UUID] = uuid_pk()
-    domain: Mapped[str] = mapped_column(String(253), unique=True, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("admin_users.id")
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
-    )
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)

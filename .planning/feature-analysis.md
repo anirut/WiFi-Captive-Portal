@@ -218,35 +218,7 @@ async def enforce_data_quotas():
 
 ---
 
-#### 6. Walled Garden / Domain Allowlist (Medium Priority)
-
-**What it is:** Allow access to specified domains without authentication.
-
-**Why other portals have it:**
-- Allow hotel website for reservations before login
-- Enable emergency services websites
-- Partner services access
-
-**Implementation approach:**
-```bash
-# nftables DNS bypass for walled garden domains
-# Resolve allowed domains to IPs, add to bypass set
-for domain in $WALLED_GARDEN_DOMAINS; do
-    IPs=$(dig +short $domain)
-    for ip in $IPs; do
-        nft add element inet captive dns_bypass {$ip}
-    done
-done
-```
-
-**Files to add:**
-- `app/models.py` - Add `WalledGardenDomain` model
-- `app/network/nftables.py` - Add `add_walled_garden()` function
-- `app/admin/router.py` - CRUD for allowed domains
-
----
-
-#### 7. MAC Address Bypass List (Medium Priority)
+#### 6. MAC Address Bypass List (Medium Priority)
 
 **What it is:** Allowlist specific MAC addresses to bypass authentication.
 
@@ -473,7 +445,6 @@ async def export_analytics(
 | Multi-Property Support | High | High | **P1** |
 | Click-to-Continue | Medium | Low | **P1** |
 | MAC Bypass | Medium | Low | **P1** |
-| Walled Garden Domains | Medium | Low | **P1** |
 | Payment Gateway | Medium | Medium | **P2** |
 | Guest Self-Service | Medium | Low | **P2** |
 | Usage Export | Low | Low | **P2** |
@@ -494,8 +465,7 @@ async def export_analytics(
 ### Phase 2: User Experience (Medium Priority)
 4. **Click-to-Continue TOS mode** - Fallback for non-guests
 5. **MAC bypass list** - IoT and staff devices
-6. **Walled garden domains** - Hotel website access
-7. **Guest self-service portal** - View usage, manage devices
+6. **Guest self-service portal** - View usage, manage devices
 
 ### Phase 3: Enterprise Features (If Chain Client)
 8. **Multi-tenant support** - Manage multiple properties
@@ -523,7 +493,6 @@ async def export_analytics(
 | Payment Gateway | ❌ | ✅ (FAS) | ❌ | ❌ | ❌ |
 | Multi-tenant | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Analytics | ✅ | ❌ | ❌ | ✅ | ✅ |
-| Walled Garden | ❌ | ✅ | ✅ | ✅ | ✅ |
 | MAC Bypass | ❌ | ✅ | ✅ | ✅ | ✅ |
 | RFC 8910 | ❌ | ✅ | ❌ | ❌ | ❌ |
 
@@ -535,7 +504,7 @@ async def export_analytics(
 **Competitive Gaps:**
 - Social/SMS authentication (addressable)
 - Multi-tenant support (critical for chains)
-- Walled garden/MAC bypass (simple additions)
+- MAC bypass (simple addition)
 
 ---
 
@@ -560,7 +529,6 @@ async def export_analytics(
 - [ ] Multi-Property/Tenant Support
 - [ ] Click-to-Continue (TOS-only) authentication mode
 - [ ] MAC Address Bypass List
-- [ ] Walled Garden Domain Allowlist
 
 ### Nice to Have (P2)
 - [ ] Payment Gateway Integration

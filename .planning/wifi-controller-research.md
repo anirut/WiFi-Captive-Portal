@@ -668,7 +668,6 @@ graph TB
 เมื่อพร้อม เปลี่ยนทั้งหมด:
 - Session enforcement → WiFi Controller
 - MAC allowlist → Controller's built-in
-- Walled garden → Controller's guest policies
 
 ---
 

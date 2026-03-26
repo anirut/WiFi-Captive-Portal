@@ -29,10 +29,12 @@ async def lifespan(app: FastAPI):
         import logging as _logging
         _logging.getLogger(__name__).warning(f"HTTPS redirect server failed to start: {_e}")
     # Restore dnsmasq config from DB (both main + auth instances)
+    # and sync mac_bypass nftables set
     try:
         from app.core.database import AsyncSessionFactory
-        from app.core.models import DhcpConfig
+        from app.core.models import DhcpConfig, MacBypass
         from app.network import dnsmasq as _dnsmasq
+        from app.network.nftables import NftablesManager as _nft
         from sqlalchemy import select as _select
         async with AsyncSessionFactory() as _db:
             _result = await _db.execute(_select(DhcpConfig))
@@ -41,6 +43,16 @@ async def lifespan(app: FastAPI):
                 _dnsmasq.write_config(_dhcp)
                 _dnsmasq.reload_dnsmasq()
                 _dnsmasq.reload_auth_dnsmasq()
+
+            # Sync mac_bypass nftables set
+            _mb_result = await _db.execute(
+                _select(MacBypass).where(MacBypass.is_active == True)
+            )
+            for _mb in _mb_result.scalars().all():
+                try:
+                    _nft.add_mac_bypass(_mb.mac_address)
+                except Exception:
+                    pass
     except Exception as _e:
         import logging as _logging
         _logging.getLogger(__name__).warning(f"dnsmasq startup restore failed: {_e}")

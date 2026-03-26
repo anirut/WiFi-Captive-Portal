@@ -1,6 +1,6 @@
 # WiFi Captive Portal — รายละเอียดโปรแกรมและฟีเจอร์
 
-> เวอร์ชัน: Phase 4 (MAC Bypass + Walled Garden + RFC 8910)
+> เวอร์ชัน: Phase 4 (MAC Bypass + RFC 8910)
 > อัปเดต: 2026-03-25
 
 ---
@@ -325,33 +325,7 @@ set mac_bypass {
 
 ---
 
-### 2.10 Walled Garden Domains
-
-อุปกรณ์ที่ยังไม่ได้ authenticate สามารถเข้าถึง**domain ที่อยู่ใน list**ได้
-
-#### การทำงาน
-1. Admin เพิ่ม domain names ใน Admin Dashboard (เช่น `spotify.com`, `apple.com`)
-2. ระบบ resolve domain → IP และเพิ่มลง nftables `walled_garden` set
-3. unauthenticated clients สามารถเข้าถึง domain เหล่านี้ได้โดยไม่ต้อง login
-
-#### nftables Integration
-```
-set walled_garden {
-    type ipv4_addr
-    flags interval
-}
-```
-- ใช้ `flags interval` สำหรับ IP ranges
-- Domain resolution ทำเมื่อ sync (ไม่ real-time)
-
-#### Use Cases
-- แอป streaming ที่ต้อง activate ก่อน (Spotify, Netflix)
-- หน้า check-in ของโรงแรม
-- Partner websites
-
----
-
-### 2.11 RFC 8910/8908 Captive Portal API
+### 2.10 RFC 8910/8908 Captive Portal API
 
 รองรับมาตรฐานใหม่สำหรับ Captive Portal Detection ที่รองรับโดยระบบปฏิบัติการสมัยใหม่
 
@@ -506,16 +480,6 @@ option portal-url "http://192.168.44.1:8080/";
 | `expires_at` | DateTime(tz) | หมดอายุ (optional) |
 | `is_active` | Boolean | เปิด/ปิดใช้งาน |
 
-### ตาราง walled_garden_domains
-| คอลัมน์ | ชนิด | รายละเอียด |
-|---------|------|-----------|
-| `id` | UUID | Primary key |
-| `domain` | String(253) | Domain name (unique) |
-| `description` | String(200) | คำอธิบาย |
-| `created_by` | UUID FK | Admin ที่สร้าง |
-| `created_at` | DateTime(tz) | เวลาที่สร้าง |
-| `is_active` | Boolean | เปิด/ปิดใช้งาน |
-
 ---
 
 ## 4. API Endpoints ทั้งหมด
@@ -566,9 +530,6 @@ option portal-url "http://192.168.44.1:8080/";
 | `GET` | `/admin/api/mac-bypass` | superadmin | รายการ MAC bypass |
 | `POST` | `/admin/api/mac-bypass` | superadmin | เพิ่ม MAC address |
 | `DELETE` | `/admin/api/mac-bypass/{id}` | superadmin | ลบ MAC address |
-| `GET` | `/admin/api/walled-garden` | superadmin | รายการ walled garden domains |
-| `POST` | `/admin/api/walled-garden` | superadmin | เพิ่ม domain |
-| `DELETE` | `/admin/api/walled-garden/{id}` | superadmin | ลบ domain |
 | `POST` | `/admin/vouchers/batch` | staff+ | สร้าง vouchers หลายตัว |
 | `GET` | `/admin/vouchers/{id}/pdf` | staff+ | Download voucher PDF |
 | `POST` | `/admin/logout` | staff+ | Logout (token blocklist) |
@@ -589,7 +550,6 @@ option portal-url "http://192.168.44.1:8080/";
 | `/admin/users` | superadmin | Admin users |
 | `/admin/dhcp` | superadmin | DHCP settings |
 | `/admin/mac-bypass` | superadmin | MAC address bypass list |
-| `/admin/walled-garden` | superadmin | Walled garden domain list |
 
 ### Internal
 

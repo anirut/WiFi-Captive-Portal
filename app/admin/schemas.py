@@ -228,22 +228,3 @@ class MacBypassResponse(BaseModel):
         from_attributes = True
 
 
-class WalledGardenDomainCreate(BaseModel):
-    domain: str = Field(
-        ...,
-        max_length=253,
-        pattern=r"^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$",
-    )
-    description: str | None = None
-
-
-class WalledGardenDomainResponse(BaseModel):
-    id: uuid.UUID
-    domain: str
-    description: str | None
-    created_by: uuid.UUID
-    created_at: datetime
-    is_active: bool
-
-    class Config:
-        from_attributes = True

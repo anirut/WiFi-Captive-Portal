@@ -1,12 +1,11 @@
-# Network Features Phase: MAC Bypass, Walled Garden, RFC 8910/8908
+# Network Features Phase: MAC Bypass, RFC 8910/8908
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add three network features to the captive portal: MAC address bypass list, walled garden domain allowlist, and RFC 8910/8908 Captive Portal API support.
+**Goal:** Add two network features to the captive portal: MAC address bypass list and RFC 8910/8908 Captive Portal API support.
 
 **Architecture:**
 - **MAC Bypass**: New `MacBypass` model with admin CRUD, check in portal login flow before showing auth page, bypass rules added to nftables `mac_bypass` set
-- **Walled Garden**: New `WalledGardenDomain` model, resolve domains to IPs at config time, add to `walled_garden` nftables set, exempt from DNS redirect
 - **RFC 8910/8908**: Add DHCP option 114 (captive-portal-url) to dnsmasq config, add `/captive-portal/api/v1/portal-info` JSON endpoint
 
 **Tech Stack:** Python, SQLAlchemy, Alembic, nftables, dnsmasq, FastAPI
@@ -16,10 +15,10 @@
 ## File Structure
 
 ```
-app/core/models.py                  # Add: MacBypass, WalledGardenDomain models
-app/network/nftables.py            # Add: mac_bypass + walled_garden set operations
-app/network/dnsmasq.py             # Add: RFC 8910 DHCP option + walled garden config
-app/admin/router.py                # Add: CRUD for MacBypass + WalledGardenDomain
+app/core/models.py                  # Add: MacBypass model
+app/network/nftables.py            # Add: mac_bypass set operations
+app/network/dnsmasq.py             # Add: RFC 8910 DHCP option
+app/admin/router.py                # Add: CRUD for MacBypass
 app/admin/schemas.py                # Add: Pydantic schemas for new models
 app/portal/router.py               # Add: MAC bypass check in portal login
 alembic/versions/                  # Add: migration for new tables
@@ -32,7 +31,7 @@ tests/                             # Add: tests for new functionality
 
 **Files:**
 - Modify: `app/core/models.py:144-163`
-- Create: `alembic/versions/xxxxxxxx_add_mac_bypass_walled_garden.py`
+- Create: `alembic/versions/xxxxxxxx_add_mac_bypass.py`
 
 - [ ] **Step 1: Add MacBypass model to models.py**
 
@@ -50,26 +49,11 @@ class MacBypass(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 ```
 
-- [ ] **Step 2: Add WalledGardenDomain model to models.py**
+- [ ] **Step 2: Create alembic migration**
 
-Add after `class MacBypass`:
+Run: `alembic revision --autogenerate -m "add mac_bypass table"`
 
-```python
-class WalledGardenDomain(Base):
-    __tablename__ = "walled_garden_domains"
-    id: Mapped[uuid.UUID] = uuid_pk()
-    domain: Mapped[str] = mapped_column(String(253), unique=True, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("admin_users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-```
-
-- [ ] **Step 3: Create alembic migration**
-
-Run: `alembic revision --autogenerate -m "add mac_bypass and walled_garden_domains tables"`
-
-- [ ] **Step 4: Verify migration file was created**
+- [ ] **Step 3: Verify migration file was created**
 
 Run: `ls -la alembic/versions/ | tail -3`
 
@@ -115,46 +99,6 @@ def is_mac_bypassed(cls, mac: str) -> bool:
         check=False, capture_output=True
     )
     return result.returncode == 0
-
-# ── Walled Garden Operations ────────────────────────────────────
-
-@classmethod
-def add_walled_garden(cls, ip: str) -> None:
-    """Add IP to walled_garden set (pre-auth access)."""
-    try:
-        cls._run(["add", "element", cls.TABLE, "walled_garden", f"{{ {ip} }}"])
-        logger.info(f"nftables: added {ip} to walled_garden")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"nftables walled_garden add failed for {ip}: {e.stderr}")
-        raise
-
-@classmethod
-def remove_walled_garden(cls, ip: str) -> None:
-    """Remove IP from walled_garden set."""
-    result = subprocess.run(
-        ["nft", "delete", "element", cls.TABLE, "walled_garden", f"{{ {ip} }}"],
-        check=False, capture_output=True
-    )
-    if result.returncode == 0:
-        logger.info(f"nftables: removed {ip} from walled_garden")
-
-@classmethod
-def sync_walled_garden(cls, domains: list[str]) -> None:
-    """Sync walled garden: resolve domains to IPs and update set."""
-    import socket
-    current_ips = set()
-    for domain in domains:
-        try:
-            ips = socket.getaddrinfo(domain, 80, socket.AF_INET)
-            for ip_info in ips:
-                current_ips.add(ip_info[4][0])
-        except socket.gaierror:
-            logger.warning(f"Could not resolve domain: {domain}")
-    
-    # Remove old entries (would need to track previous IPs — simplified for now)
-    # In production, store previous IPs in DB and diff
-    for ip in current_ips:
-        cls.add_walled_garden(ip)
 ```
 
 - [ ] **Step 2: Verify nftables commands work**
@@ -195,20 +139,6 @@ class MacBypassResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class WalledGardenDomainCreate(BaseModel):
-    domain: str = Field(..., max_length=253)
-    description: str | None = None
-
-class WalledGardenDomainResponse(BaseModel):
-    id: uuid.UUID
-    domain: str
-    description: str | None
-    created_by: uuid.UUID
-    created_at: datetime
-    is_active: bool
-
-    class Config:
-        from_attributes = True
 ```
 
 ---
@@ -279,65 +209,6 @@ async def delete_mac_bypass(
         logger.warning(f"Failed to remove MAC from nftables: {e}")
     
     await db.delete(mac)
-    await db.commit()
-    return {"status": "deleted"}
-```
-
-- [ ] **Step 2: Add WalledGardenDomain routes**
-
-Add after MAC Bypass section:
-
-```python
-# ── Walled Garden Domains ────────────────────────────────────────────────────────
-
-@router.get("/api/walled-garden", response_model=list[WalledGardenDomainResponse])
-async def list_walled_garden(
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(require_superadmin),
-):
-    result = await db.execute(
-        select(WalledGardenDomain).order_by(WalledGardenDomain.created_at.desc())
-    )
-    return result.scalars().all()
-
-@router.post("/api/walled-garden", status_code=201)
-async def create_walled_garden_domain(
-    body: WalledGardenDomainCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(require_superadmin),
-):
-    domain = WalledGardenDomain(
-        domain=body.domain.lower(),
-        description=body.description,
-        created_by=uuid.UUID(current_user["sub"]),
-    )
-    db.add(domain)
-    await db.commit()
-    await db.refresh(domain)
-    
-    # Resolve and add to nftables
-    from app.network.nftables import NftablesManager
-    try:
-        NftablesManager.sync_walled_garden([domain.domain])
-    except Exception as e:
-        logger.warning(f"Failed to sync walled garden: {e}")
-    
-    return domain
-
-@router.delete("/api/walled-garden/{domain_id}")
-async def delete_walled_garden_domain(
-    domain_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(require_superadmin),
-):
-    result = await db.execute(select(WalledGardenDomain).where(WalledGardenDomain.id == domain_id))
-    wg = result.scalar_one_or_none()
-    if not wg:
-        raise HTTPException(404, {"error": "not_found"})
-    
-    # Note: Removing IPs from nftables requires tracking resolved IPs
-    # For simplicity, we just delete the domain record
-    await db.delete(wg)
     await db.commit()
     return {"status": "deleted"}
 ```
@@ -453,7 +324,6 @@ async def portal_login(request: Request, db: AsyncSession = Depends(get_db)):
 
 **Files:**
 - Create: `app/admin/templates/mac_bypass.html`
-- Create: `app/admin/templates/walled_garden.html`
 - Modify: `app/admin/templates/base.html`
 
 - [ ] **Step 1: MAC Bypass template**
@@ -468,44 +338,23 @@ Features:
 - Empty state with icon
 - Info box with usage instructions
 
-- [ ] **Step 2: Walled Garden template**
+- [ ] **Step 2: Navigation update**
 
-Design: Purple (#a855f7) accent color for "security/garden" theme. Domain icon in hero, auto-sync indicator, example domain chips, table with domain badges.
-
-Features:
-- Hero card with auto-sync indicator
-- Collapsible add form
-- Example domain chips that auto-fill input
-- Table with domain status
-- Delete confirmation
-- Empty state with fence icon
-- Info box explaining DNS resolution
-
-- [ ] **Step 3: Navigation update**
-
-Add nav items to `base.html` sidebar:
+Add nav item to `base.html` sidebar:
 ```html
 <a href="/admin/mac-bypass" class="nav-item ...">
   <!-- MAC icon -->
   <span>MAC Bypass</span>
 </a>
-<a href="/admin/walled-garden" class="nav-item ...">
-  <!-- Garden icon -->
-  <span>Walled Garden</span>
-</a>
 ```
 
-- [ ] **Step 4: Page routes in router**
+- [ ] **Step 3: Page routes in router**
 
 Add to `app/admin/router.py`:
 ```python
 @router.get("/mac-bypass", response_class=HTMLResponse)
 async def mac_bypass_page(...):
     # Query MacBypass table, render mac_bypass.html
-
-@router.get("/walled-garden", response_class=HTMLResponse)
-async def walled_garden_page(...):
-    # Query WalledGardenDomain table, render walled_garden.html
 ```
 
 ---
@@ -514,7 +363,6 @@ async def walled_garden_page(...):
 
 **Files:**
 - Create: `tests/test_mac_bypass.py`
-- Create: `tests/test_walled_garden.py`
 - Create: `tests/test_captive_portal_api.py`
 
 - [ ] **Step 1: Test MacBypass model and routes**
@@ -552,24 +400,7 @@ async def test_mac_bypass_login_flow():
             # ... test full flow
 ```
 
-- [ ] **Step 2: Test WalledGardenDomain**
-
-```python
-# tests/test_walled_garden.py
-@pytest.mark.asyncio
-async def test_create_walled_garden_domain():
-    with patch("app.network.nftables.NftablesManager.sync_walled_garden") as mock_sync:
-        mock_sync.return_value = None
-        
-        response = await client.post(
-            "/admin/api/walled-garden",
-            json={"domain": "hotel.example.com", "description": "Hotel website"}
-        )
-        assert response.status_code == 201
-        assert response.json()["domain"] == "hotel.example.com"
-```
-
-- [ ] **Step 3: Test RFC 8908 API**
+- [ ] **Step 2: Test RFC 8908 API**
 
 ```python
 # tests/test_captive_portal_api.py
@@ -590,7 +421,7 @@ async def test_portal_info_endpoint():
 
 - [ ] **Step 1: Generate and apply migration**
 
-Run: `alembic revision --autogenerate -m "add mac_bypass and walled_garden_domains tables"`
+Run: `alembic revision --autogenerate -m "add mac_bypass table"`
 
 Run: `alembic upgrade head`
 
@@ -604,14 +435,13 @@ Verify: `alembic current`
 
 ```bash
 git add app/core/models.py app/network/nftables.py app/network/dnsmasq.py app/admin/router.py app/admin/schemas.py app/portal/router.py alembic/versions/ tests/
-git commit -m "feat: add MAC bypass, walled garden, and RFC 8910/8908 support
+git commit -m "feat: add MAC bypass and RFC 8910/8908 support
 
 - Add MacBypass model for device allowlisting
-- Add WalledGardenDomain model for pre-auth domain access
-- Add nftables mac_bypass and walled_garden sets
+- Add nftables mac_bypass set
 - Add RFC 8910 DHCP option for captive portal URL
 - Add RFC 8908 /captive-portal/api/v1/portal-info endpoint
-- Add admin CRUD for MAC bypass and walled garden domains
+- Add admin CRUD for MAC bypass
 - Integrate MAC bypass check in portal login flow
 "
 ```
@@ -624,16 +454,7 @@ Add these sets to `scripts/setup-nftables.sh`:
 
 ```bash
 # Add before existing sets
-add set inet captive_portal mac_bypass { type mac_addr\; }
-add set inet captive_portal walled_garden { type ipv4_addr\; }
-```
-
-Rules for pre-auth access:
-```
-# Allow walled garden IPs through without auth
-ip saddr @walled_garden accept
-
-# MAC bypass handled at layer 2 via interface matching
+add set inet captive_portal mac_bypass { type ether_addr\; }
 ```
 
 ---

@@ -22,7 +22,6 @@ A production-ready **Hotel WiFi Captive Portal** system with enterprise-grade fe
  - 🔗 **Self-Service Disconnect** - Guests type `http://logout.wifi` to disconnect from any device
  - 🧬 **Dual DNS Architecture** - Separate dnsmasq instances for unauthenticated (port 53) and authenticated (port 5354) clients
  - 📋 **MAC Address Bypass** - Allow specific devices to bypass authentication
- - 🌐 **Walled Garden Domains** - Allow access to specific domains without authentication
  - 📡 **RFC 8910/8908 Captive Portal API** - Modern captive portal detection standard
 
 ---
@@ -467,9 +466,6 @@ mindmap
     MAC Bypass
       Device Allowlist
       Auto-expiry
-    Walled Garden
-      Domain Allowlist
-      Pre-auth Access
     Captive Portal API
       RFC 8910/8908
       Modern Detection

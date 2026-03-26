@@ -229,7 +229,7 @@ tests/
 - **FastAPI modular monolith** for hotel captive portal
 - **MAC-based session persistence**: sessions tracked by MAC address, not IP
 - **Dual DNS**: dnsmasq on port 53 (unauthenticated) + dnsmasq-auth on port 5354 (authenticated)
-- **nftables sets**: whitelist, dns_bypass, doh_servers, mac_bypass, walled_garden
+- **nftables sets**: whitelist, dns_bypass, doh_servers, mac_bypass
 - **tc HTB**: bandwidth shaping via class ID = `int(octet3) * 256 + int(octet4)`
 - **Scheduler**: APScheduler with `wait=False` on shutdown
 

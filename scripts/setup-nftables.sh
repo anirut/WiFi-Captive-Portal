@@ -94,6 +94,11 @@ table inet captive_portal {
         }
     }
 
+    # Client MAC addresses that bypass the captive portal entirely
+    set mac_bypass {
+        type ether_addr
+    }
+
     chain prerouting {
         type nat hook prerouting priority dstnat; policy accept;
 
@@ -105,6 +110,9 @@ table inet captive_portal {
         # (handles clients with hardcoded DNS like 8.8.8.8, 1.1.1.1)
         ip saddr != @dns_bypass udp dport 53 dnat to $PORTAL_IP:53
         ip saddr != @dns_bypass tcp dport 53 dnat to $PORTAL_IP:53
+
+        # MAC bypass: mark connection and skip portal redirect
+        ether saddr @mac_bypass ct mark set 0x2 accept
 
         # http://logout and https://logout — let ALL clients reach the portal
         # (authenticated/whitelisted clients would otherwise bypass the DNAT below)
@@ -121,6 +129,7 @@ table inet captive_portal {
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         oifname $WAN_IF ip saddr @whitelist masquerade
+        oifname $WAN_IF ct mark 0x2 masquerade
     }
 
     chain input {
@@ -134,6 +143,8 @@ table inet captive_portal {
         # OS/browser falls back to plain DNS port 53 (intercepted → our proxy)
         ip saddr @dns_bypass ip daddr @doh_servers tcp dport 443 reject with icmp type admin-prohibited
         ip saddr @whitelist accept
+        # MAC bypass: allow full internet access for bypassed devices
+        ct mark 0x2 accept
         reject with icmp type host-unreachable
     }
 }

@@ -42,7 +42,7 @@ def write_config(config) -> None:
         "dhcp-option=option:domain-search,wifi",
         "",
         "# RFC 8910: Captive Portal API — DHCP Option 114 (captive-portal-url)",
-        f"dhcp-option=option:captive-portal-url,http://{config.gateway_ip}/",
+        f"dhcp-option=114,http://{config.gateway_ip}/",
         "",
         "# DNS upstream",
         f"server={config.dns_upstream_1}",
