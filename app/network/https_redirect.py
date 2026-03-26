@@ -4,35 +4,44 @@ https_redirect.py - Mini asyncio HTTPS server for captive portal.
 Accepts TLS connections on port 8443, responds with HTTP 302 redirect
 to the HTTP portal login page. nftables DNATs port 443 here for
 unauthenticated clients so HTTPS browsing triggers the portal.
+
+Uses SNI (Server Name Indication) to generate certificates for the requested
+hostname, allowing the browser to accept the certificate and receive the redirect.
 """
 
 import asyncio
 import ssl
 import logging
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
 HTTPS_REDIRECT_PORT = 8443
 _CERT_DIR = Path("certs")
-_CERT_FILE = _CERT_DIR / "portal.crt"
-_KEY_FILE = _CERT_DIR / "portal.key"
+_CERT_CACHE = {}  # hostname -> (cert_path, key_path)
 
 
-def _generate_self_signed_cert() -> None:
-    """Generate a self-signed certificate using the cryptography library."""
+def _generate_self_signed_cert_for_hostname(hostname: str) -> tuple[str, str]:
+    """Generate a self-signed certificate for a specific hostname on-demand."""
     from cryptography import x509
     from cryptography.x509.oid import NameOID
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
-    from datetime import datetime, timezone, timedelta
 
-    logger.info("Generating self-signed certificate for HTTPS redirect...")
     _CERT_DIR.mkdir(exist_ok=True)
 
-    key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
+    # Generate RSA key (2048 for speed)
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "captive.portal")])
+    # Create certificate with the hostname and wildcard SAN
+    san_list = [x509.DNSName(hostname)]
+
+    # Add wildcard SAN for subdomain matching
+    if not hostname.startswith("*."):
+        san_list.append(x509.DNSName(f"*.{hostname}"))
+
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, hostname)])
     cert = (
         x509.CertificateBuilder()
         .subject_name(name)
@@ -40,40 +49,69 @@ def _generate_self_signed_cert() -> None:
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.now(timezone.utc))
-        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=3650))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=1))
         .add_extension(
-            x509.SubjectAlternativeName([x509.DNSName("captive.portal")]),
+            x509.SubjectAlternativeName(san_list),
             critical=False,
         )
         .sign(key, hashes.SHA256())
     )
 
-    _KEY_FILE.write_bytes(
+    # Save cert and key to files
+    cert_file = _CERT_DIR / f"{hostname}.crt"
+    key_file = _CERT_DIR / f"{hostname}.key"
+
+    key_file.write_bytes(
         key.private_bytes(
             serialization.Encoding.PEM,
             serialization.PrivateFormat.TraditionalOpenSSL,
             serialization.NoEncryption(),
         )
     )
-    _CERT_FILE.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-    logger.info(f"Self-signed certificate written to {_CERT_FILE}")
+    cert_file.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+
+    logger.debug(f"Generated cert for {hostname}")
+    return str(cert_file), str(key_file)
 
 
-def _ensure_cert() -> None:
-    if not _CERT_FILE.exists() or not _KEY_FILE.exists():
-        _generate_self_signed_cert()
+def _get_cert_for_hostname(hostname: str) -> tuple[str, str]:
+    """Get or generate certificate for hostname, with caching."""
+    # Normalize hostname (remove www., port, etc.)
+    hostname = hostname.lower().split(":")[0].lstrip("www.")
+
+    if hostname not in _CERT_CACHE:
+        cert_file, key_file = _generate_self_signed_cert_for_hostname(hostname)
+        _CERT_CACHE[hostname] = (cert_file, key_file)
+
+    return _CERT_CACHE[hostname]
 
 
 async def start_https_redirect_server(
     portal_ip: str, portal_port: int
 ) -> asyncio.Server:
-    """Start SSL server on HTTPS_REDIRECT_PORT that redirects all requests to the portal."""
-    _ensure_cert()
+    """Start SSL server on HTTPS_REDIRECT_PORT that redirects all requests to the portal.
 
-    ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ssl_ctx.load_cert_chain(str(_CERT_FILE), str(_KEY_FILE))
-
+    Uses SNI to dynamically generate certificates for the requested hostname,
+    so browsers accept the certificate and receive the HTTP 302 redirect.
+    """
     redirect_to = f"http://{portal_ip}:{portal_port}/"
+
+    # Create a default SSL context with a fallback certificate
+    ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    fallback_cert, fallback_key = _get_cert_for_hostname("localhost")
+    ssl_ctx.load_cert_chain(fallback_cert, fallback_key)
+
+    def sni_callback(ssl_obj: ssl.SSLObject, server_name: str | None, _context) -> int:
+        """Load certificate for the SNI hostname."""
+        if server_name:
+            try:
+                cert_file, key_file = _get_cert_for_hostname(server_name)
+                ssl_obj.load_cert_chain(cert_file, key_file)
+            except Exception as e:
+                logger.warning(f"Failed to load cert for {server_name}: {e}")
+        return 0
+
+    ssl_ctx.sni_callback = sni_callback
 
     async def _handler(
         reader: asyncio.StreamReader, writer: asyncio.StreamWriter
