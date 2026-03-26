@@ -74,16 +74,23 @@ def _generate_self_signed_cert_for_hostname(hostname: str) -> tuple[str, str]:
     return str(cert_file), str(key_file)
 
 
-def _get_cert_for_hostname(hostname: str) -> tuple[str, str]:
-    """Get or generate certificate for hostname, with caching."""
-    # Normalize hostname (remove www., port, etc.)
-    hostname = hostname.lower().split(":")[0].lstrip("www.")
+_CTX_CACHE = {}  # hostname -> ssl.SSLContext
 
-    if hostname not in _CERT_CACHE:
+
+def _get_ssl_context_for_hostname(hostname: str) -> ssl.SSLContext:
+    """Get or build an SSLContext with a matching certificate for the hostname."""
+    # Normalize: strip www., strip port
+    hostname = hostname.lower().split(":")[0]
+    if hostname.startswith("www."):
+        hostname = hostname[4:]
+
+    if hostname not in _CTX_CACHE:
         cert_file, key_file = _generate_self_signed_cert_for_hostname(hostname)
-        _CERT_CACHE[hostname] = (cert_file, key_file)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(cert_file, key_file)
+        _CTX_CACHE[hostname] = ctx
 
-    return _CERT_CACHE[hostname]
+    return _CTX_CACHE[hostname]
 
 
 async def start_https_redirect_server(
@@ -96,22 +103,18 @@ async def start_https_redirect_server(
     """
     redirect_to = f"http://{portal_ip}:{portal_port}/"
 
-    # Create a default SSL context with a fallback certificate
-    ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    fallback_cert, fallback_key = _get_cert_for_hostname("localhost")
-    ssl_ctx.load_cert_chain(fallback_cert, fallback_key)
+    # Build fallback SSL context (used when client sends no SNI)
+    default_ctx = _get_ssl_context_for_hostname("localhost")
 
-    def sni_callback(ssl_obj: ssl.SSLObject, server_name: str | None, _context) -> int:
-        """Load certificate for the SNI hostname."""
-        if server_name:
-            try:
-                cert_file, key_file = _get_cert_for_hostname(server_name)
-                ssl_obj.load_cert_chain(cert_file, key_file)
-            except Exception as e:
-                logger.warning(f"Failed to load cert for {server_name}: {e}")
-        return 0
+    def sni_callback(ssl_obj: ssl.SSLObject, server_name: str | None, _context) -> None:
+        """Switch to a hostname-matching SSLContext based on the SNI extension."""
+        target = server_name or "localhost"
+        try:
+            ssl_obj.context = _get_ssl_context_for_hostname(target)
+        except Exception as e:
+            logger.warning(f"SNI cert switch failed for {target}: {e}")
 
-    ssl_ctx.sni_callback = sni_callback
+    default_ctx.sni_callback = sni_callback
 
     async def _handler(
         reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -161,7 +164,7 @@ async def start_https_redirect_server(
                 pass
 
     server = await asyncio.start_server(
-        _handler, "0.0.0.0", HTTPS_REDIRECT_PORT, ssl=ssl_ctx
+        _handler, "0.0.0.0", HTTPS_REDIRECT_PORT, ssl=default_ctx
     )
     logger.info(
         f"HTTPS redirect server listening on :{HTTPS_REDIRECT_PORT} → {redirect_to}"
