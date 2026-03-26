@@ -117,21 +117,42 @@ async def start_https_redirect_server(
         reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         try:
-            # Consume the request so the browser doesn't get a RST mid-stream
-            await asyncio.wait_for(reader.read(4096), timeout=5.0)
-        except Exception:
-            pass
+            # Read the HTTP request line (e.g., "GET / HTTP/1.1\r\n")
+            # Use readline with a timeout to wait for the request
+            request_line = await asyncio.wait_for(reader.readline(), timeout=5.0)
+            if not request_line:
+                logger.debug("No HTTP request received")
+                writer.close()
+                return
+
+            # Read remaining headers until empty line
+            while True:
+                header = await asyncio.wait_for(reader.readline(), timeout=5.0)
+                if header == b"\r\n" or not header:
+                    break
+        except asyncio.TimeoutError:
+            logger.debug("Timeout waiting for HTTP request")
+            writer.close()
+            return
+        except Exception as e:
+            logger.debug(f"Error reading request: {e}")
+            writer.close()
+            return
+
         try:
-            writer.write(
+            # Send HTTP 302 redirect response
+            response = (
                 f"HTTP/1.1 302 Found\r\n"
                 f"Location: {redirect_to}\r\n"
                 f"Content-Length: 0\r\n"
                 f"Connection: close\r\n"
-                f"\r\n".encode()
+                f"\r\n"
             )
+            writer.write(response.encode())
             await writer.drain()
-        except Exception:
-            pass
+            logger.debug(f"Sent 302 redirect to {redirect_to}")
+        except Exception as e:
+            logger.warning(f"Error sending redirect response: {e}")
         finally:
             writer.close()
             try:
